@@ -1,0 +1,26 @@
+import { Router } from 'express';
+import * as evaluacionController from '../controllers/evaluacionController.js';
+import * as preguntasController from '../controllers/preguntasController.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
+
+const router = Router();
+
+router.get('/', authMiddleware, evaluacionController.obtenerEvaluaciones);
+router.post('/', authMiddleware, requireRole(['docente']), evaluacionController.crearEvaluacion);
+router.get('/asignaturas', authMiddleware, evaluacionController.obtenerAsignaturas);
+router.get('/:id', authMiddleware, evaluacionController.obtenerEvaluacionPorId);
+router.get('/:id/preguntas', authMiddleware, preguntasController.obtenerPreguntasPorEvaluacion);
+router.post('/:evaluacionId/preguntas', authMiddleware, preguntasController.crearPregunta);
+router.put('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.editarPregunta);
+router.delete('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.eliminarPregunta);
+router.get('/:id/respuestas', authMiddleware, evaluacionController.obtenerRespuestasEvaluacion);
+router.get('/:id/mis-respuestas', authMiddleware, evaluacionController.obtenerRespuestasEstudiante);
+router.post('/:id/verificar-password', authMiddleware, evaluacionController.verificarContraseña);
+router.post('/:id/enviar', authMiddleware, evaluacionController.enviarRespuestas);
+router.delete('/:id/respuesta/:respuestaId', authMiddleware, evaluacionController.borrarRespuestas);
+router.delete('/:id', authMiddleware, requireRole(['docente']), evaluacionController.eliminarEvaluacion);
+router.put('/:id', authMiddleware, requireRole(['docente']), evaluacionController.editarEvaluacion);
+
+export default router;
+router.get('/:id/respuesta/:respuestaEstudianteId/puntaje', authMiddleware, evaluacionController.calcularPuntaje);
+router.post('/:evaluacionId/respuesta-detalle/:respuestaDetalleId/calificar', authMiddleware, evaluacionController.calificarRespuestaAbierta);
