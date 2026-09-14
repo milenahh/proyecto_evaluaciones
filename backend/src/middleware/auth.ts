@@ -4,6 +4,10 @@ import { verifyToken } from '../utils/auth.js';
 export interface AuthRequest extends Request {
   userId?: number;
   role?: string;
+  body: any;
+  params: any;
+  query: any;
+  headers: any;
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
