@@ -24,3 +24,8 @@ router.put('/:id', authMiddleware, requireRole(['docente']), evaluacionControlle
 export default router;
 router.get('/:id/respuesta/:respuestaEstudianteId/puntaje', authMiddleware, evaluacionController.calcularPuntaje);
 router.post('/:evaluacionId/respuesta-detalle/:respuestaDetalleId/calificar', authMiddleware, evaluacionController.calificarRespuestaAbierta);
+
+router.get('/:id/respuesta/:respuestaEstudianteId/calificacion', authMiddleware, evaluacionController.obtenerCalificacionFinal);
+router.post('/:id/respuesta/:respuestaEstudianteId/calificacion-final', authMiddleware, requireRole(['docente']), evaluacionController.guardarCalificacionFinal);
+
+router.get('/:id/respuesta/:respuestaEstudianteId/puntaje-manual', authMiddleware, evaluacionController.calcularPuntajeManuaTotal);

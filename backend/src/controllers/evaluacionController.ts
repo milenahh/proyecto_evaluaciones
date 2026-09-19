@@ -288,3 +288,77 @@ export const calificarRespuestaAbierta = async (req: AuthRequest, res: Response)
     res.status(500).json({ error: e.message });
   }
 };
+
+export const obtenerCalificacionFinal = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, respuestaEstudianteId } = req.params;
+    
+    const respResult = await pool.query(
+      'SELECT estudiante_id, puntaje_obtenido, puntaje_manual_total, puntaje_final, fecha_calificacion_completa FROM respuestas_estudiante WHERE id = $1 AND evaluacion_id = $2',
+      [respuestaEstudianteId, id]
+    );
+    
+    const respuesta = respResult.rows[0];
+    if (!respuesta) return res.status(404).json({ error: 'Respuesta no encontrada' });
+    
+    if (req.role === 'estudiante' && respuesta.estudiante_id !== req.userId) {
+      return res.status(403).json({ error: 'No tienes permiso' });
+    }
+    
+    res.json(respuesta);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const guardarCalificacionFinal = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, respuestaEstudianteId } = req.params;
+    const { puntaje_manual_total } = req.body;
+    
+    const respResult = await pool.query(
+      'SELECT puntaje_obtenido FROM respuestas_estudiante WHERE id = $1 AND evaluacion_id = $2',
+      [respuestaEstudianteId, id]
+    );
+    
+    const respuesta = respResult.rows[0];
+    if (!respuesta) return res.status(404).json({ error: 'Respuesta no encontrada' });
+    
+    const puntaje_automatico = respuesta.puntaje_obtenido || 0;
+    const puntaje_final = parseFloat(puntaje_automatico) + parseFloat(puntaje_manual_total);
+    
+    await pool.query(
+      `UPDATE respuestas_estudiante 
+       SET puntaje_manual_total = $1, puntaje_final = $2, fecha_calificacion_completa = NOW()
+       WHERE id = $3 AND evaluacion_id = $4`,
+      [puntaje_manual_total, puntaje_final, respuestaEstudianteId, id]
+    );
+    
+    res.json({ success: true, puntaje_final });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const calcularPuntajeManuaTotal = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, respuestaEstudianteId } = req.params;
+    
+    // Sumar todos los puntajes de respuestas abiertas calificadas
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(rd.puntaje_obtenido), 0) as puntaje_manual_total
+       FROM respuesta_detalle rd
+       JOIN preguntas p ON rd.pregunta_id = p.id
+       WHERE rd.respuesta_estudiante_id = $1 
+       AND p.tipo = 'ensayo' 
+       AND rd.puntaje_obtenido IS NOT NULL`,
+      [respuestaEstudianteId]
+    );
+    
+    const puntaje_manual_total = result.rows[0].puntaje_manual_total;
+    
+    res.json({ puntaje_manual_total });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
