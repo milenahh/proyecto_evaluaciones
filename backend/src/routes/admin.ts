@@ -18,6 +18,7 @@ router.delete('/asignaturas/:id', authMiddleware, requireRole(['admin']), adminC
 router.get('/asignaturas/:asignaturaId/docentes', authMiddleware, adminController.obtenerDocentesPorAsignatura);
 router.post('/estudiante-asignatura', authMiddleware, requireRole(['admin']), adminController.asignarEstudianteAsignatura);
 router.delete('/asignaturas/:asignaturaId/estudiantes/:estudianteId', authMiddleware, requireRole(['admin']), adminController.quitarEstudianteAsignatura);
+router.get('/usuarios/:id/asignaturas', authMiddleware, requireRole(['admin']), adminController.obtenerAsignaturasDeUsuario);
 router.get('/asignaturas/:asignaturaId/estudiantes', authMiddleware, adminController.obtenerEstudiantesPorAsignatura);
 router.get('/asignaturas/:asignaturaId/docentes', authMiddleware, adminController.obtenerDocentesPorAsignatura);
 router.get('/asignaturas/:asignaturaId/docentes', authMiddleware, adminController.obtenerDocentesPorAsignatura);

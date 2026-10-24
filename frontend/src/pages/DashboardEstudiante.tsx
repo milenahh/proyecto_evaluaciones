@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import api from '../services/api';
 
 interface Evaluacion {
   id: number;
@@ -32,10 +33,8 @@ export default function DashboardEstudiante() {
   useEffect(() => {
     const fetchEvaluaciones = async () => {
       try {
-        const response = await fetch('/api/evaluaciones', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await response.json();
+        const response = await api.get('/evaluaciones');
+        const data = response.data;
         setEvals(data);
 
         const respondidas_map = new Map<number, RespuestaEstudiante>();
@@ -43,24 +42,16 @@ export default function DashboardEstudiante() {
 
         for (const evaluacion of data) {
           try {
-            const respResponse = await fetch(`/api/evaluaciones/${evaluacion.id}/mis-respuestas`, {
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            const respData = await respResponse.json();
+            const respResponse = await api.get(`/evaluaciones/${evaluacion.id}/mis-respuestas`);
+            const respData = respResponse.data;
 
             if (respData.length > 0) {
               const respuesta = respData[0];
               respondidas_map.set(evaluacion.id, respuesta);
 
               try {
-                const calResponse = await fetch(
-                  `/api/evaluaciones/${evaluacion.id}/respuesta/${respuesta.id}/calificacion`,
-                  { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-                );
-                if (calResponse.ok) {
-                  const calData = await calResponse.json();
-                  calificaciones_map.set(evaluacion.id, calData);
-                }
+                const calResponse = await api.get(`/evaluaciones/${evaluacion.id}/respuesta/${respuesta.id}/calificacion`);
+                calificaciones_map.set(evaluacion.id, calResponse.data);
               } catch (error) {
                 console.log(`No hay calificación aún para evaluación ${evaluacion.id}`);
               }

@@ -21,6 +21,8 @@ const AdminPanel: React.FC = () => {
   const [asignaturaSeleccionada, setAsignaturaSeleccionada] = useState<any>(null);
   const [docentesAsignatura, setDocentesAsignatura] = useState<any[]>([]);
   const [estudiantesAsignatura, setEstudiantesAsignatura] = useState<any[]>([]);
+  const [asignaturasUsuario, setAsignaturasUsuario] = useState<any[]>([]);
+  const [asigNueva, setAsigNueva] = useState('');
 
   useEffect(() => {
     cargarDatos();
@@ -31,6 +33,8 @@ const AdminPanel: React.FC = () => {
       if (tab === 'usuarios') {
         const res = await api.get('/admin/usuarios');
         setUsuarios(res.data);
+        const asigRes = await api.get('/admin/asignaturas');
+        setAsignaturas(asigRes.data);
       } else if (tab === 'asignaturas') {
         const res = await api.get('/admin/asignaturas');
         setAsignaturas(res.data);
@@ -62,6 +66,43 @@ const AdminPanel: React.FC = () => {
       setEstudiantesAsignatura(res.data);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const cargarAsignaturasUsuario = async (usuarioId: number) => {
+    try {
+      const res = await api.get(`/admin/usuarios/${usuarioId}/asignaturas`);
+      setAsignaturasUsuario(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const abrirEdicionUsuario = (u: any) => {
+    setEditandoUsuario({ ...u, contrasena: '' });
+    setAsigNueva('');
+    setAsignaturasUsuario([]);
+    cargarAsignaturasUsuario(u.id);
+  };
+
+  const handleAgregarAsignaturaUsuario = async () => {
+    if (!asigNueva) return;
+    try {
+      await api.post('/admin/estudiante-asignatura', { estudiante_id: editandoUsuario.id, asignatura_id: parseInt(asigNueva) });
+      setAsigNueva('');
+      await cargarAsignaturasUsuario(editandoUsuario.id);
+    } catch (e) {
+      alert('Error al agregar la asignatura');
+    }
+  };
+
+  const handleQuitarAsignaturaUsuario = async (asignaturaId: number) => {
+    if (!window.confirm('¿Quitar esta asignatura al estudiante?')) return;
+    try {
+      await api.delete(`/admin/asignaturas/${asignaturaId}/estudiantes/${editandoUsuario.id}`);
+      await cargarAsignaturasUsuario(editandoUsuario.id);
+    } catch (e) {
+      alert('Error al quitar la asignatura');
     }
   };
 
@@ -217,7 +258,7 @@ const AdminPanel: React.FC = () => {
                       <p className="text-sm text-gray-600">{u.email} - {u.rol}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setEditandoUsuario(u)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm">Editar</button>
+                      <button onClick={() => abrirEdicionUsuario(u)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm">Editar</button>
                       <button onClick={() => handleEliminarUsuario(u.id)} className="bg-red-600 text-white px-2 py-1 rounded text-sm">Eliminar</button>
                     </div>
                   </div>
@@ -324,7 +365,7 @@ const AdminPanel: React.FC = () => {
 
                 <div>
                   <label className="block font-bold mb-2">Contraseña (dejar en blanco para no cambiar)</label>
-                  <input type="password" onChange={(e) => setEditandoUsuario({...editandoUsuario, contrasena: e.target.value})} className="w-full p-2 border rounded" />
+                  <input type="password" autoComplete="new-password" value={editandoUsuario.contrasena || ''} onChange={(e) => setEditandoUsuario({...editandoUsuario, contrasena: e.target.value})} className="w-full p-2 border rounded" />
                 </div>
 
                 <div>
@@ -335,6 +376,32 @@ const AdminPanel: React.FC = () => {
                     <option value="admin">Admin</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="mt-6">
+                <p className="font-bold mb-2">Asignaturas {editandoUsuario.rol === 'docente' ? 'del docente' : 'del estudiante'} ({asignaturasUsuario.length})</p>
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                  {asignaturasUsuario.map(a => (
+                    <div key={a.id} className="p-2 bg-gray-100 rounded flex justify-between items-center">
+                      <span className="text-sm">{a.nombre}</span>
+                      {editandoUsuario.rol === 'estudiante' && (
+                        <button onClick={() => handleQuitarAsignaturaUsuario(a.id)} className="bg-red-600 text-white px-2 py-1 rounded text-xs">Quitar</button>
+                      )}
+                    </div>
+                  ))}
+                  {asignaturasUsuario.length === 0 && <p className="text-gray-500 text-sm">Sin asignaturas</p>}
+                </div>
+                {editandoUsuario.rol === 'estudiante' && (
+                  <div className="flex gap-2">
+                    <select value={asigNueva} onChange={(e) => setAsigNueva(e.target.value)} className="flex-1 p-2 border rounded text-sm">
+                      <option value="">Selecciona asignatura</option>
+                      {asignaturas.filter(a => !asignaturasUsuario.some(x => x.id === a.id)).map(a => (
+                        <option key={a.id} value={a.id}>{a.nombre}</option>
+                      ))}
+                    </select>
+                    <button onClick={handleAgregarAsignaturaUsuario} className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold">Agregar</button>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 mt-6">

@@ -198,17 +198,17 @@ export const borrarRespuestas = async (req: AuthRequest, res: Response) => {
 export const editarEvaluacion = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, contraseña } = req.body;
+    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, contraseña, asignatura_id } = req.body;
 
-    let query = `UPDATE evaluaciones SET titulo = $1, descripcion = $2, puntaje_total = $3, tiempo_limite_minutos = $4, fecha_inicio = $5, fecha_fin = $6`;
-    let params: any[] = [titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin];
+    let query = `UPDATE evaluaciones SET titulo = $1, descripcion = $2, puntaje_total = $3, tiempo_limite_minutos = $4, fecha_inicio = $5, fecha_fin = $6, asignatura_id = COALESCE($7, asignatura_id)`;
+    let params: any[] = [titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, asignatura_id ? parseInt(asignatura_id) : null];
 
     if (contraseña) {
       const contraseña_hash = await hashPassword(contraseña);
-      query += `, contraseña = $7 WHERE id = $8`;
+      query += `, contraseña = $8 WHERE id = $9`;
       params.push(contraseña_hash);
     } else {
-      query += ` WHERE id = $7`;
+      query += ` WHERE id = $8`;
     }
 
     params.push(id);

@@ -16,8 +16,11 @@ const AgregarPreguntas: React.FC = () => {
   const [enunciadoEdit, setEnunciadoEdit] = useState('');
   const [opcionesEdit, setOpcionesEdit] = useState<any[]>([]);
 
+  const [asignaturas, setAsignaturas] = useState<any[]>([]);
+
   const [formParcial, setFormParcial] = useState<any>({
     titulo: '',
+    asignatura_id: '',
     descripcion: '',
     puntaje_total: 0,
     tiempo_limite_minutos: 0,
@@ -35,6 +38,14 @@ const AgregarPreguntas: React.FC = () => {
 
   useEffect(() => {
     cargarParcial();
+    (async () => {
+      try {
+        const r = await api.get('/evaluaciones/asignaturas');
+        setAsignaturas(r.data);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, [parcialId]);
 
   const cargarParcial = async () => {
@@ -43,6 +54,7 @@ const AgregarPreguntas: React.FC = () => {
       setParcial(res.data);
       setFormParcial({
         titulo: res.data.titulo,
+        asignatura_id: res.data.asignatura_id || '',
         descripcion: res.data.descripcion,
         puntaje_total: res.data.puntaje_total,
         tiempo_limite_minutos: res.data.tiempo_limite_minutos,
@@ -137,6 +149,7 @@ const AgregarPreguntas: React.FC = () => {
     try {
       const payload = {
         titulo: formParcial.titulo,
+        asignatura_id: formParcial.asignatura_id,
         descripcion: formParcial.descripcion,
         puntaje_total: formParcial.puntaje_total,
         tiempo_limite_minutos: formParcial.tiempo_limite_minutos,
@@ -303,6 +316,15 @@ const AgregarPreguntas: React.FC = () => {
                 <div>
                   <label className="block font-bold mb-2">Título</label>
                   <input type="text" value={formParcial.titulo} onChange={(e) => setFormParcial({...formParcial, titulo: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+
+                <div>
+                  <label className="block font-bold mb-2">Asignatura</label>
+                  <select value={formParcial.asignatura_id} onChange={(e) => setFormParcial({...formParcial, asignatura_id: e.target.value})} className="w-full p-2 border rounded">
+                    {asignaturas.map(a => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

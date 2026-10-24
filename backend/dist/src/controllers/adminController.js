@@ -154,6 +154,28 @@ export const quitarEstudianteAsignatura = async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 };
+export const obtenerAsignaturasDeUsuario = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rolRes = await pool.query('SELECT rol FROM usuarios WHERE id = $1', [id]);
+        const rol = rolRes.rows[0]?.rol;
+        let result;
+        if (rol === 'docente') {
+            result = await pool.query(`SELECT a.id, a.nombre FROM asignaturas a
+         JOIN docente_asignatura da ON a.id = da.asignatura_id
+         WHERE da.usuario_id = $1 ORDER BY a.nombre`, [id]);
+        }
+        else {
+            result = await pool.query(`SELECT a.id, a.nombre FROM asignaturas a
+         JOIN estudiante_asignatura ea ON a.id = ea.asignatura_id
+         WHERE ea.estudiante_id = $1 ORDER BY a.nombre`, [id]);
+        }
+        res.json(result.rows);
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
 export const obtenerEstudiantesPorAsignatura = async (req, res) => {
     try {
         const { asignaturaId } = req.params;
