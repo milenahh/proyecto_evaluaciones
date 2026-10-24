@@ -16,6 +16,7 @@ const TomarEvaluacion: React.FC = () => {
   const incidentesRef = useRef<{ tipo: string; hora: string }[]>([]);
   const ultimoRef = useRef(0);
   const [numIncidentes, setNumIncidentes] = useState(0);
+  const [mostrarAviso, setMostrarAviso] = useState(false);
 
   const registrarIncidente = (tipo: string) => {
     const ahora = Date.now();
@@ -51,6 +52,7 @@ const TomarEvaluacion: React.FC = () => {
 
   const comenzar = () => {
     setRespondiendo(true);
+    setMostrarAviso(true);
     document.documentElement.requestFullscreen?.().catch(() => {});
   };
 
@@ -149,6 +151,32 @@ const TomarEvaluacion: React.FC = () => {
   if (respondiendo) {
     return (
       <div className="min-h-screen bg-gray-50">
+        {mostrarAviso && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded shadow-lg max-w-lg w-full p-8 text-center">
+              <h2 className="text-2xl font-bold text-red-700 mb-4">⚠ Evaluación monitoreada</h2>
+              <p className="mb-3">Mientras presentas esta evaluación <strong>no puedes</strong>:</p>
+              <ul className="text-left list-disc list-inside mb-4 space-y-1">
+                <li>Cambiar de pestaña o abrir otra página</li>
+                <li>Minimizar o salir de la ventana</li>
+                <li>Salir de la pantalla completa</li>
+                <li>Copiar, cortar o pegar texto</li>
+              </ul>
+              <p className="text-sm text-gray-700 mb-6">
+                Cada salida queda registrada con la hora y el docente la verá junto a tus respuestas.
+              </p>
+              <button
+                onClick={() => {
+                  setMostrarAviso(false);
+                  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-3 rounded font-bold"
+              >
+                Entendido, comenzar
+              </button>
+            </div>
+          </div>
+        )}
         <Header />
         <div className="max-w-4xl mx-auto p-6">
           <button onClick={() => navigate('/dashboard')} className="mb-6 px-4 py-2 bg-gray-600 text-white rounded">← Atrás</button>
