@@ -107,7 +107,7 @@ export const verificarContraseña = async (req, res) => {
 export const enviarRespuestas = async (req, res) => {
     try {
         const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        const { respuestas } = req.body;
+        const { respuestas, incidentes } = req.body;
         const evalCheck = await pool.query('SELECT fecha_inicio, fecha_fin FROM evaluaciones WHERE id = $1', [parseInt(id)]);
         const eval_data = evalCheck.rows[0];
         const ahora = new Date();
@@ -125,6 +125,9 @@ export const enviarRespuestas = async (req, res) => {
         const respId = r1.rows[0].id;
         for (const resp of respuestas) {
             await pool.query('INSERT INTO respuesta_detalle (respuesta_estudiante_id, pregunta_id, respuesta_texto) VALUES ($1, $2, $3)', [respId, resp.pregunta_id, resp.respuesta_texto]);
+        }
+        if (Array.isArray(incidentes) && incidentes.length > 0) {
+            await pool.query('UPDATE respuestas_estudiante SET cambios_pestana = $1, log_incidentes = $2 WHERE id = $3', [incidentes.length, JSON.stringify(incidentes), respId]);
         }
         res.json({ success: true });
     }

@@ -34,7 +34,7 @@ export const exportarRespuestasExcel = async (req: AuthRequest, res: Response) =
     opRes.rows.forEach((o: any) => { opciones[o.id] = o; });
 
     const respRes = await pool.query(
-      `SELECT re.id, u.nombre_completo, u.apellido, u.email, re.fecha_envio
+      `SELECT re.id, u.nombre_completo, u.apellido, u.email, re.fecha_envio, re.cambios_pestana, re.log_incidentes
        FROM respuestas_estudiante re
        JOIN usuarios u ON u.id = re.estudiante_id
        WHERE re.evaluacion_id = $1
@@ -69,6 +69,8 @@ export const exportarRespuestasExcel = async (req: AuthRequest, res: Response) =
     });
     columnas.push({ header: 'Puntaje final', key: 'total', width: 14 });
     columnas.push({ header: `Sobre`, key: 'sobre', width: 10 });
+    columnas.push({ header: 'Salidas de la evaluación', key: 'salidas', width: 16 });
+    columnas.push({ header: 'Detalle de salidas', key: 'detalle_salidas', width: 50 });
     ws.columns = columnas;
 
     for (const r of respRes.rows) {
@@ -77,6 +79,10 @@ export const exportarRespuestasExcel = async (req: AuthRequest, res: Response) =
         email: r.email,
         fecha: r.fecha_envio ? new Date(r.fecha_envio).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : '',
         sobre: puntajeTotal,
+        salidas: r.cambios_pestana || 0,
+        detalle_salidas: Array.isArray(r.log_incidentes)
+          ? r.log_incidentes.map((x: any) => `${new Date(x.hora).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' })} ${x.tipo}`).join(' | ')
+          : '',
       };
       let total = 0;
       preguntas.forEach((p: any, i: number) => {
@@ -122,6 +128,10 @@ export const exportarRespuestasExcel = async (req: AuthRequest, res: Response) =
         row.getCell(`r${i}`).alignment = { wrapText: true, vertical: 'top' };
       });
       row.getCell('total').font = { bold: true };
+      if ((r.cambios_pestana || 0) > 0) {
+        row.getCell('salidas').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
+      }
+      row.getCell('detalle_salidas').alignment = { wrapText: true, vertical: 'top' };
     }
 
     const header = ws.getRow(1);

@@ -130,7 +130,7 @@ export const verificarContraseña = async (req: AuthRequest, res: Response) => {
 export const enviarRespuestas = async (req: AuthRequest, res: Response) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const { respuestas } = req.body;
+    const { respuestas, incidentes } = req.body;
     
     const evalCheck = await pool.query(
       'SELECT fecha_inicio, fecha_fin FROM evaluaciones WHERE id = $1',
@@ -167,6 +167,13 @@ export const enviarRespuestas = async (req: AuthRequest, res: Response) => {
       await pool.query(
         'INSERT INTO respuesta_detalle (respuesta_estudiante_id, pregunta_id, respuesta_texto) VALUES ($1, $2, $3)',
         [respId, resp.pregunta_id, resp.respuesta_texto]
+      );
+    }
+
+    if (Array.isArray(incidentes) && incidentes.length > 0) {
+      await pool.query(
+        'UPDATE respuestas_estudiante SET cambios_pestana = $1, log_incidentes = $2 WHERE id = $3',
+        [incidentes.length, JSON.stringify(incidentes), respId]
       );
     }
     
