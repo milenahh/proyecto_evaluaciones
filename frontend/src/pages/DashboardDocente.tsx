@@ -207,7 +207,14 @@ const DashboardDocente: React.FC = () => {
           ) : (
             estudiantes.map(e => (
               <div key={e.id} className="bg-white p-4 mb-3 rounded cursor-pointer" onClick={() => handleSelectEstudiante(e)}>
-                <h3 className="font-bold">{e.nombre_completo}</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold">{e.nombre_completo}</h3>
+                  {e.cambios_pestana > 0 ? (
+                    <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">⚠ {e.cambios_pestana} salida(s)</span>
+                  ) : (
+                    <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">Sin salidas</span>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -231,6 +238,22 @@ const DashboardDocente: React.FC = () => {
               <p className="text-sm text-gray-600">Automático: {puntajeAuto.puntaje_automatico.toFixed(2)} + Manual: {(totalPuntaje - puntajeAuto.puntaje_automatico).toFixed(2)}</p>
             </div>
           )}
+
+          <div className={`p-4 rounded mb-6 ${respuestasDetalle?.cambios_pestana > 0 ? 'bg-red-50 border border-red-300' : 'bg-green-50 border border-green-300'}`}>
+            <p className="font-bold mb-1">Reporte de monitoreo</p>
+            {respuestasDetalle?.cambios_pestana > 0 ? (
+              <>
+                <p className="text-sm mb-2">Salidas registradas: <strong>{respuestasDetalle.cambios_pestana}</strong></p>
+                <ul className="text-sm list-disc list-inside">
+                  {(respuestasDetalle.log_incidentes || []).map((x: any, i: number) => (
+                    <li key={i}>{new Date(x.hora).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' })} — {x.tipo}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm">No se registraron salidas de la evaluación.</p>
+            )}
+          </div>
 
           <h2 className="text-lg font-bold mb-4">Todas las Respuestas</h2>
           {puntajeAuto?.respuestas_con_puntuacion?.map((r: any, i: number) => {
