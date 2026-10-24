@@ -65,6 +65,16 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleQuitarEstudiante = async (estudianteId: number) => {
+    if (!window.confirm('¿Quitar este estudiante de la asignatura?')) return;
+    try {
+      await api.delete(`/admin/asignaturas/${asignaturaSeleccionada.id}/estudiantes/${estudianteId}`);
+      await cargarEstudiantesAsignatura(asignaturaSeleccionada.id);
+    } catch (e) {
+      alert('Error al quitar el estudiante');
+    }
+  };
+
   const handleCrearUsuario = async (e: any) => {
     e.preventDefault();
     try {
@@ -203,7 +213,7 @@ const AdminPanel: React.FC = () => {
                 {usuarios.map(u => (
                   <div key={u.id} className="p-3 bg-gray-100 rounded flex justify-between items-center">
                     <div>
-                      <p className="font-bold">{u.nombre_completo}</p>
+                      <p className="font-bold">{u.nombre_completo} {u.apellido}</p>
                       <p className="text-sm text-gray-600">{u.email} - {u.rol}</p>
                     </div>
                     <div className="flex gap-2">
@@ -271,7 +281,7 @@ const AdminPanel: React.FC = () => {
                 <select value={formRelacion.docente_id} onChange={(e) => setFormRelacion({...formRelacion, docente_id: e.target.value})} required className="w-full p-2 border rounded">
                   <option value="">Selecciona docente</option>
                   {docentes.map(d => (
-                    <option key={d.id} value={d.id}>{d.nombre_completo}</option>
+                    <option key={d.id} value={d.id}>{d.nombre_completo} {d.apellido}</option>
                   ))}
                 </select>
               </div>
@@ -406,9 +416,12 @@ const AdminPanel: React.FC = () => {
                   <p className="font-bold mb-2">Estudiantes Asignados ({estudiantesAsignatura.length})</p>
                   <div className="space-y-2">
                     {estudiantesAsignatura.map(e => (
-                      <div key={e.id} className="p-2 bg-green-100 rounded">
-                        <p className="font-bold text-sm">{e.nombre_completo}</p>
-                        <p className="text-xs text-gray-600">{e.email}</p>
+                      <div key={e.id} className="p-2 bg-green-100 rounded flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-sm">{e.nombre_completo}</p>
+                          <p className="text-xs text-gray-600">{e.email}</p>
+                        </div>
+                        <button onClick={() => handleQuitarEstudiante(e.id)} className="bg-red-600 text-white px-2 py-1 rounded text-xs">Quitar</button>
                       </div>
                     ))}
                     {estudiantesAsignatura.length === 0 && (
@@ -424,7 +437,7 @@ const AdminPanel: React.FC = () => {
                   <select value={formEstudianteAsig.estudiante_id} onChange={(e) => setFormEstudianteAsig({...formEstudianteAsig, estudiante_id: e.target.value})} required className="flex-1 p-2 border rounded text-sm">
                     <option value="">Selecciona estudiante</option>
                     {estudiantes.map(e => (
-                      <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+                      <option key={e.id} value={e.id}>{e.nombre_completo} {e.apellido}</option>
                     ))}
                   </select>
                   <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold">Agregar</button>

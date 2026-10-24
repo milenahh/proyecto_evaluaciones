@@ -21,7 +21,7 @@ export const login = async (req, res) => {
         console.log('Generando token para usuario:', usuario.id, usuario.rol);
         const token = generateToken(usuario.id, usuario.rol);
         console.log('Token generado:', token);
-        const respuesta = { token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: usuario.nombre_completo, rol: usuario.rol } };
+        const respuesta = { token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: `${usuario.nombre_completo} ${usuario.apellido || ''}`.trim(), rol: usuario.rol } };
         console.log('Enviando respuesta:', respuesta);
         res.json(respuesta);
     }
@@ -44,7 +44,7 @@ export const register = async (req, res) => {
         const result = await pool.query('INSERT INTO usuarios (email, contraseña_hash, nombre_completo, apellido, rol) VALUES ($1, $2, $3, $4, $5) RETURNING *', [email, contraseña_hash, nombre_completo, apellido, rol || 'estudiante']);
         const usuario = result.rows[0];
         const token = generateToken(usuario.id, usuario.rol);
-        res.status(201).json({ token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: usuario.nombre_completo, rol: usuario.rol } });
+        res.status(201).json({ token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: `${usuario.nombre_completo} ${usuario.apellido || ''}`.trim(), rol: usuario.rol } });
     }
     catch (error) {
         console.error('Register error:', error);

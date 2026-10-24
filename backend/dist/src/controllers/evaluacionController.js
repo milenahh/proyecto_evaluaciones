@@ -69,13 +69,13 @@ export const obtenerEvaluacionPorId = async (req, res) => {
 export const obtenerRespuestasEvaluacion = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(`SELECT re.id, re.evaluacion_id, re.estudiante_id, u.nombre_completo, re.estado, re.fecha_envio,
+        const result = await pool.query(`SELECT re.id, re.evaluacion_id, re.estudiante_id, TRIM(u.nombre_completo || ' ' || COALESCE(u.apellido, '')) AS nombre_completo, re.estado, re.fecha_envio,
               json_agg(json_build_object('pregunta_id', rd.pregunta_id, 'respuesta_texto', rd.respuesta_texto, 'opcion_id', rd.opcion_seleccionada_id)) as respuestas
        FROM respuestas_estudiante re
        JOIN usuarios u ON re.estudiante_id = u.id
        LEFT JOIN respuesta_detalle rd ON re.id = rd.respuesta_estudiante_id
        WHERE re.evaluacion_id = $1
-       GROUP BY re.id, re.evaluacion_id, re.estudiante_id, u.nombre_completo, re.estado, re.fecha_envio`, [id]);
+       GROUP BY re.id, re.evaluacion_id, re.estudiante_id, u.nombre_completo, u.apellido, re.estado, re.fecha_envio`, [id]);
         res.json(result.rows);
     }
     catch (e) {

@@ -98,7 +98,7 @@ export const relacionarDocenteAsignatura = async (req, res) => {
 export const obtenerUsuarios = async (req, res) => {
     try {
         const { rol } = req.query;
-        let query = 'SELECT id, nombre_completo, email, rol FROM usuarios';
+        let query = 'SELECT id, nombre_completo, apellido, email, rol FROM usuarios';
         if (rol)
             query += ` WHERE rol = $1`;
         const result = rol
@@ -122,7 +122,7 @@ export const obtenerAsignaturas = async (req, res) => {
 export const obtenerDocentesPorAsignatura = async (req, res) => {
     try {
         const { asignaturaId } = req.params;
-        const result = await pool.query(`SELECT u.id, u.nombre_completo, u.email FROM usuarios u
+        const result = await pool.query(`SELECT u.id, TRIM(u.nombre_completo || ' ' || COALESCE(u.apellido, '')) AS nombre_completo, u.email FROM usuarios u
        JOIN docente_asignatura da ON u.id = da.usuario_id
        WHERE da.asignatura_id = $1 AND u.rol = 'docente'`, [asignaturaId]);
         res.json(result.rows);
@@ -143,10 +143,21 @@ export const asignarEstudianteAsignatura = async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 };
+export const quitarEstudianteAsignatura = async (req, res) => {
+    try {
+        const { asignaturaId, estudianteId } = req.params;
+        await pool.query('DELETE FROM estudiante_asignatura WHERE asignatura_id = $1 AND estudiante_id = $2', [asignaturaId, estudianteId]);
+        res.json({ success: true });
+    }
+    catch (e) {
+        console.error('Error quitarEstudianteAsignatura:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+};
 export const obtenerEstudiantesPorAsignatura = async (req, res) => {
     try {
         const { asignaturaId } = req.params;
-        const result = await pool.query(`SELECT u.id, u.nombre_completo, u.email FROM usuarios u
+        const result = await pool.query(`SELECT u.id, TRIM(u.nombre_completo || ' ' || COALESCE(u.apellido, '')) AS nombre_completo, u.email FROM usuarios u
        JOIN estudiante_asignatura ea ON u.id = ea.estudiante_id
        WHERE ea.asignatura_id = $1 AND u.rol = 'estudiante'`, [asignaturaId]);
         res.json(result.rows);

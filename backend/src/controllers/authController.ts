@@ -24,7 +24,7 @@ export const login = async (req: AuthRequest, res: Response) => {
     console.log('Generando token para usuario:', usuario.id, usuario.rol);
     const token = generateToken(usuario.id, usuario.rol);
     console.log('Token generado:', token);
-    const respuesta = { token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: usuario.nombre_completo, rol: usuario.rol } };
+    const respuesta = { token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: `${usuario.nombre_completo} ${usuario.apellido || ''}`.trim(), rol: usuario.rol } };
     console.log('Enviando respuesta:', respuesta);
     res.json(respuesta);
   } catch (error) {
@@ -50,7 +50,7 @@ export const register = async (req: AuthRequest, res: Response) => {
     );
     const usuario = result.rows[0];
     const token = generateToken(usuario.id, usuario.rol);
-    res.status(201).json({ token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: usuario.nombre_completo, rol: usuario.rol } });
+    res.status(201).json({ token, usuario: { id: usuario.id, email: usuario.email, nombre_completo: `${usuario.nombre_completo} ${usuario.apellido || ''}`.trim(), rol: usuario.rol } });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Registration failed' });
