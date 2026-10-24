@@ -2,6 +2,8 @@ import { Router } from 'express';
 import * as evaluacionController from '../controllers/evaluacionController.js';
 import * as preguntasController from '../controllers/preguntasController.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { exportarRespuestasExcel } from '../controllers/exportController.js';
+import { archivarEvaluacion } from '../controllers/archivoController.js';
 const router = Router();
 router.get('/', authMiddleware, evaluacionController.obtenerEvaluaciones);
 router.post('/', authMiddleware, requireRole(['docente']), evaluacionController.crearEvaluacion);
@@ -12,6 +14,8 @@ router.post('/:evaluacionId/preguntas', authMiddleware, preguntasController.crea
 router.put('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.editarPregunta);
 router.delete('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.eliminarPregunta);
 router.get('/:id/respuestas', authMiddleware, evaluacionController.obtenerRespuestasEvaluacion);
+router.put('/:id/archivar', authMiddleware, requireRole(['docente', 'admin']), archivarEvaluacion);
+router.get('/:id/exportar', authMiddleware, requireRole(['docente', 'admin']), exportarRespuestasExcel);
 router.get('/:id/mis-respuestas', authMiddleware, evaluacionController.obtenerRespuestasEstudiante);
 router.post('/:id/verificar-password', authMiddleware, evaluacionController.verificarContraseña);
 router.post('/:id/enviar', authMiddleware, evaluacionController.enviarRespuestas);
@@ -21,3 +25,6 @@ router.put('/:id', authMiddleware, requireRole(['docente']), evaluacionControlle
 export default router;
 router.get('/:id/respuesta/:respuestaEstudianteId/puntaje', authMiddleware, evaluacionController.calcularPuntaje);
 router.post('/:evaluacionId/respuesta-detalle/:respuestaDetalleId/calificar', authMiddleware, evaluacionController.calificarRespuestaAbierta);
+router.get('/:id/respuesta/:respuestaEstudianteId/calificacion', authMiddleware, evaluacionController.obtenerCalificacionFinal);
+router.post('/:id/respuesta/:respuestaEstudianteId/calificacion-final', authMiddleware, requireRole(['docente']), evaluacionController.guardarCalificacionFinal);
+router.get('/:id/respuesta/:respuestaEstudianteId/puntaje-manual', authMiddleware, evaluacionController.calcularPuntajeManuaTotal);

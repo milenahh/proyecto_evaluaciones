@@ -15,6 +15,7 @@ const DashboardDocente: React.FC = () => {
   const [selectedEval, setSelectedEval] = useState<any>(null);
   const [puntajeAuto, setPuntajeAuto] = useState<any>(null);
   const [calificaciones, setCalificaciones] = useState<any>({});
+  const [verArchivadas, setVerArchivadas] = useState(false);
 
   const cargarEvaluaciones = async () => {
     try {
@@ -107,6 +108,31 @@ const DashboardDocente: React.FC = () => {
     }
   };
 
+  const handleArchivar = async (evalId: number, archivada: boolean) => {
+    try {
+      await api.put(`/evaluaciones/${evalId}/archivar`, { archivada });
+      await cargarEvaluaciones();
+    } catch (e) {
+      alert('Error al archivar');
+    }
+  };
+
+  const handleDescargarExcel = async (evalId: number, titulo: string) => {
+    try {
+      const res = await api.get(`/evaluaciones/${evalId}/exportar`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(titulo || 'evaluacion').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Error al descargar el Excel');
+    }
+  };
+
   const handleEliminarParcial = async (evalId: number) => {
     if (window.confirm('¿ELIMINAR este parcial? Se borrarán todas las respuestas.')) {
       try {
@@ -130,13 +156,31 @@ const DashboardDocente: React.FC = () => {
               <button onClick={() => navigate('/docente/crear-parcial')} className="bg-green-600 text-white px-4 py-2 rounded font-bold">+ Crear Parcial</button>
             </div>
           </div>
-          {evaluaciones.length === 0 ? (
-            <p className="text-gray-500">Sin parciales</p>
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setVerArchivadas(false)}
+              className={`px-4 py-2 rounded font-bold ${!verArchivadas ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            >
+              Activas ({evaluaciones.filter(e => !e.archivada).length})
+            </button>
+            <button
+              onClick={() => setVerArchivadas(true)}
+              className={`px-4 py-2 rounded font-bold ${verArchivadas ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            >
+              Archivadas ({evaluaciones.filter(e => e.archivada).length})
+            </button>
+          </div>
+          {evaluaciones.filter(e => !!e.archivada === verArchivadas).length === 0 ? (
+            <p className="text-gray-500">{verArchivadas ? 'Sin actividades archivadas' : 'Sin parciales activos'}</p>
           ) : (
-            evaluaciones.map(e => (
+            evaluaciones.filter(e => !!e.archivada === verArchivadas).map(e => (
               <div key={e.id} className="bg-white p-4 mb-3 rounded">
                 <div className="flex justify-between items-center">
                   <h3 className="font-bold cursor-pointer flex-1" onClick={() => handleSelectEval(e.id)}>{e.titulo}</h3>
+                  <button onClick={() => handleDescargarExcel(e.id, e.titulo)} className="bg-emerald-600 text-white px-3 py-1 rounded text-sm mr-2">Excel</button>
+                  <button onClick={() => handleArchivar(e.id, !verArchivadas)} className="bg-yellow-600 text-white px-3 py-1 rounded text-sm mr-2">
+                    {verArchivadas ? 'Desarchivar' : 'Archivar'}
+                  </button>
                   <button onClick={() => navigate(`/docente/parcial/${e.id}/preguntas`)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm mr-2">Editar</button>
                   <button onClick={() => handleEliminarParcial(e.id)} className="bg-red-600 text-white px-3 py-1 rounded text-sm">Eliminar</button>
                 </div>
@@ -154,7 +198,10 @@ const DashboardDocente: React.FC = () => {
         <Header />
         <div className="max-w-6xl mx-auto p-6">
           <button onClick={() => setViewLevel('evaluaciones')} className="mb-6 px-4 py-2 bg-gray-600 text-white rounded">← Atrás</button>
-          <h1 className="text-2xl font-bold mb-4">{selectedEval?.titulo}</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">{selectedEval?.titulo}</h1>
+            <button onClick={() => handleDescargarExcel(selectedEval.id, selectedEval.titulo)} className="bg-emerald-600 text-white px-4 py-2 rounded font-bold">Descargar Excel</button>
+          </div>
           {estudiantes.length === 0 ? (
             <p className="text-gray-500">Sin respuestas</p>
           ) : (

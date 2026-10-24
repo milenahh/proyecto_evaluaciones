@@ -2,6 +2,8 @@ import { Router } from 'express';
 import * as evaluacionController from '../controllers/evaluacionController.js';
 import * as preguntasController from '../controllers/preguntasController.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { exportarRespuestasExcel } from '../controllers/exportController.js';
+import { archivarEvaluacion } from '../controllers/archivoController.js';
 
 const router = Router();
 
@@ -14,6 +16,8 @@ router.post('/:evaluacionId/preguntas', authMiddleware, preguntasController.crea
 router.put('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.editarPregunta);
 router.delete('/:evaluacionId/preguntas/:preguntaId', authMiddleware, preguntasController.eliminarPregunta);
 router.get('/:id/respuestas', authMiddleware, evaluacionController.obtenerRespuestasEvaluacion);
+router.put('/:id/archivar', authMiddleware, requireRole(['docente', 'admin']), archivarEvaluacion);
+router.get('/:id/exportar', authMiddleware, requireRole(['docente', 'admin']), exportarRespuestasExcel);
 router.get('/:id/mis-respuestas', authMiddleware, evaluacionController.obtenerRespuestasEstudiante);
 router.post('/:id/verificar-password', authMiddleware, evaluacionController.verificarContraseña);
 router.post('/:id/enviar', authMiddleware, evaluacionController.enviarRespuestas);
