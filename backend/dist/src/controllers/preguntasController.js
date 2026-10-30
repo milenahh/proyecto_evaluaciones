@@ -24,7 +24,7 @@ export const obtenerPreguntasPorEvaluacion = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`SELECT p.id, p.evaluacion_id, p.enunciado, p.tipo, p.orden, p.respuesta_esperada,
-              json_agg(json_build_object('id', o.id, 'contenido', o.contenido, 'es_correcta', o.es_correcta)) as opciones
+              COALESCE(json_agg(json_build_object('id', o.id, 'contenido', o.contenido, 'es_correcta', o.es_correcta)) FILTER (WHERE o.id IS NOT NULL), '[]'::json) as opciones
        FROM preguntas p
        LEFT JOIN opciones o ON p.id = o.pregunta_id
        WHERE p.evaluacion_id = $1
@@ -47,9 +47,11 @@ export const editarPregunta = async (req, res) => {
         const { preguntaId } = req.params;
         const { enunciado, opciones, respuesta_esperada } = req.body;
         await pool.query(`UPDATE preguntas SET enunciado = $1, respuesta_esperada = COALESCE($3::text, respuesta_esperada) WHERE id = $2`, [enunciado, preguntaId, respuesta_esperada === undefined ? null : respuesta_esperada]);
-        if (opciones && opciones.length > 0) {
+        const tipoRes = await pool.query('SELECT tipo FROM preguntas WHERE id = $1', [preguntaId]);
+        const opcionesValidas = (opciones || []).filter((op) => op && op.contenido);
+        if (tipoRes.rows[0]?.tipo === 'seleccion_multiple' && opcionesValidas.length > 0) {
             await pool.query(`DELETE FROM opciones WHERE pregunta_id = $1`, [preguntaId]);
-            for (const op of opciones) {
+            for (const op of opcionesValidas) {
                 await pool.query(`INSERT INTO opciones (pregunta_id, contenido, es_correcta) VALUES ($1, $2, $3)`, [preguntaId, op.contenido, op.es_correcta]);
             }
         }
