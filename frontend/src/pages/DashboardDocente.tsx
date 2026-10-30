@@ -16,6 +16,7 @@ const DashboardDocente: React.FC = () => {
   const [puntajeAuto, setPuntajeAuto] = useState<any>(null);
   const [calificaciones, setCalificaciones] = useState<any>({});
   const [verArchivadas, setVerArchivadas] = useState(false);
+  const [retros, setRetros] = useState<any>({});
 
   const cargarEvaluaciones = async () => {
     try {
@@ -46,7 +47,16 @@ const DashboardDocente: React.FC = () => {
     try {
       const puntRes = await api.get(`/evaluaciones/${selectedEval.id}/respuesta/${est.id}/puntaje`);
       setPuntajeAuto(puntRes.data);
-      setCalificaciones({});
+      const califIniciales: any = {};
+      const retrosIniciales: any = {};
+      (puntRes.data.respuestas_con_puntuacion || []).forEach((r: any) => {
+        if (r.puntaje_obtenido !== null && r.puntaje_obtenido !== undefined && r.tipo !== 'seleccion_multiple') {
+          califIniciales[r.id] = String(r.puntaje_obtenido);
+        }
+        if (r.retroalimentacion) retrosIniciales[r.id] = r.retroalimentacion;
+      });
+      setCalificaciones(califIniciales);
+      setRetros(retrosIniciales);
     } catch (e) {
       console.error(e);
     }
@@ -82,16 +92,38 @@ const DashboardDocente: React.FC = () => {
   const handleCalificar = async (detalleId: number) => {
     try {
       const puntaje = calificaciones[detalleId];
-      if (puntaje === undefined || puntaje === '') {
-        alert('Ingresa un puntaje');
-        return;
-      }
-      await api.post(`/evaluaciones/${selectedEval.id}/respuesta-detalle/${detalleId}/calificar`, { puntaje: parseFloat(puntaje) });
-      alert('Calificación guardada');
+      await api.post(`/evaluaciones/${selectedEval.id}/respuesta-detalle/${detalleId}/calificar`, {
+        puntaje: puntaje === undefined || puntaje === '' ? null : parseFloat(puntaje),
+        retroalimentacion: retros[detalleId] || ''
+      });
+      alert('Guardado');
       const puntRes = await api.get(`/evaluaciones/${selectedEval.id}/respuesta/${respuestasDetalle.id}/puntaje`);
       setPuntajeAuto(puntRes.data);
     } catch (e) {
       alert('Error');
+    }
+  };
+
+  const recargarEstudiantes = async () => {
+    const resp_data = await api.get(`/evaluaciones/${selectedEval.id}/respuestas`);
+    setEstudiantes(resp_data.data);
+    return resp_data.data;
+  };
+
+  const handlePublicar = async (publicar: boolean, respuestaIds?: number[]) => {
+    const mensaje = publicar
+      ? (respuestaIds ? '¿Publicar la calificación y la retroalimentación a este estudiante?' : '¿Publicar las calificaciones y la retroalimentación a TODOS los estudiantes de esta evaluación?')
+      : (respuestaIds ? '¿Ocultar la calificación a este estudiante?' : '¿Ocultar las calificaciones a TODOS los estudiantes de esta evaluación?');
+    if (!window.confirm(mensaje)) return;
+    try {
+      await api.post(`/evaluaciones/${selectedEval.id}/publicar-calificaciones`, { publicar, respuesta_ids: respuestaIds });
+      const lista = await recargarEstudiantes();
+      if (respuestasDetalle) {
+        const actualizado = lista.find((x: any) => x.id === respuestasDetalle.id);
+        if (actualizado) setRespuestasDetalle(actualizado);
+      }
+    } catch (e) {
+      alert('Error al publicar');
     }
   };
 
@@ -200,7 +232,11 @@ const DashboardDocente: React.FC = () => {
           <button onClick={() => setViewLevel('evaluaciones')} className="mb-6 px-4 py-2 bg-gray-600 text-white rounded">← Atrás</button>
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">{selectedEval?.titulo}</h1>
-            <button onClick={() => handleDescargarExcel(selectedEval.id, selectedEval.titulo)} className="bg-emerald-600 text-white px-4 py-2 rounded font-bold">Descargar Excel</button>
+            <div className="flex gap-2">
+              <button onClick={() => handlePublicar(true)} className="bg-purple-600 text-white px-4 py-2 rounded font-bold">Publicar todas</button>
+              <button onClick={() => handlePublicar(false)} className="bg-gray-500 text-white px-4 py-2 rounded font-bold">Ocultar todas</button>
+              <button onClick={() => handleDescargarExcel(selectedEval.id, selectedEval.titulo)} className="bg-emerald-600 text-white px-4 py-2 rounded font-bold">Descargar Excel</button>
+            </div>
           </div>
           {estudiantes.length === 0 ? (
             <p className="text-gray-500">Sin respuestas</p>
@@ -209,6 +245,9 @@ const DashboardDocente: React.FC = () => {
               <div key={e.id} className="bg-white p-4 mb-3 rounded cursor-pointer" onClick={() => handleSelectEstudiante(e)}>
                 <div className="flex justify-between items-center">
                   <h3 className="font-bold">{e.nombre_completo}</h3>
+                  <span className={`text-xs font-bold px-2 py-1 rounded mx-2 ${e.calificacion_publicada ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-600'}`}>
+                    {e.calificacion_publicada ? 'Calificación publicada' : 'No publicada'}
+                  </span>
                   {e.cambios_pestana > 0 ? (
                     <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">⚠ {e.cambios_pestana} salida(s)</span>
                   ) : (
@@ -231,7 +270,19 @@ const DashboardDocente: React.FC = () => {
         <Header />
         <div className="max-w-6xl mx-auto p-6">
           <button onClick={() => setViewLevel('estudiantes')} className="mb-4 px-4 py-2 bg-gray-600 text-white rounded">← Atrás</button>
-          <h1 className="text-xl font-bold mb-2">{respuestasDetalle?.nombre_completo}</h1>
+          <div className="flex justify-between items-center mb-2">
+            <h1 className="text-xl font-bold">{respuestasDetalle?.nombre_completo}</h1>
+            {respuestasDetalle?.calificacion_publicada ? (
+              <button onClick={() => handlePublicar(false, [respuestasDetalle.id])} className="bg-gray-500 text-white px-4 py-2 rounded font-bold">Ocultar calificación al estudiante</button>
+            ) : (
+              <button onClick={() => handlePublicar(true, [respuestasDetalle.id])} className="bg-purple-600 text-white px-4 py-2 rounded font-bold">Publicar calificación al estudiante</button>
+            )}
+          </div>
+          <p className="text-sm mb-2">
+            {respuestasDetalle?.calificacion_publicada
+              ? 'El estudiante ya puede ver su calificación y retroalimentación. Si cambias algo, se refleja automáticamente.'
+              : 'El estudiante todavía no puede ver su calificación ni la retroalimentación.'}
+          </p>
           {puntajeAuto && (
             <div className="bg-blue-100 p-4 rounded mb-6">
               <p className="font-bold">Puntaje Total: {totalPuntaje.toFixed(2)} / {puntajeAuto.puntaje_total}</p>
@@ -271,24 +322,39 @@ const DashboardDocente: React.FC = () => {
                 </div>
                 <p>Respondió: <strong>{getRespuestaTexto(r)}</strong></p>
 
-                {r.tipo === 'ensayo' && (
-                  <div className="mt-4 p-3 bg-yellow-50 rounded">
-                    <label className="block font-bold mb-2">Calificar respuesta abierta:</label>
-                    <div className="flex gap-2">
+                {r.tipo !== 'seleccion_multiple' && preg?.respuesta_esperada && (
+                  <div className="mt-3 p-3 bg-green-50 rounded text-sm">
+                    <p className="font-bold mb-1">Respuesta esperada (la ven los estudiantes al publicar)</p>
+                    <p className="whitespace-pre-wrap">{preg.respuesta_esperada}</p>
+                  </div>
+                )}
+
+                <div className="mt-4 p-3 bg-yellow-50 rounded">
+                  {r.tipo !== 'seleccion_multiple' && (
+                    <>
+                      <label className="block font-bold mb-2">Calificar respuesta abierta (máx. {(puntajeAuto.puntaje_total / (preguntas.length || 1)).toFixed(2)}):</label>
                       <input
                         type="number"
                         step="0.1"
                         min="0"
-                        max={5 / (puntajeAuto.respuestas_con_puntuacion?.length || 1)}
+                        max={puntajeAuto.puntaje_total / (preguntas.length || 1)}
                         value={calificaciones[r.id] || ''}
                         onChange={(e) => setCalificaciones({...calificaciones, [r.id]: e.target.value})}
                         placeholder="Puntaje"
-                        className="flex-1 p-2 border rounded"
+                        className="w-full p-2 border rounded mb-3"
                       />
-                      <button onClick={() => handleCalificar(r.id)} className="bg-green-600 text-white px-4 py-2 rounded font-bold">Guardar</button>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
+                  <label className="block font-bold mb-2">Comentario adicional para este estudiante (opcional):</label>
+                  <textarea
+                    value={retros[r.id] || ''}
+                    onChange={(e) => setRetros({...retros, [r.id]: e.target.value})}
+                    rows={2}
+                    placeholder="Solo si quieres agregar algo particular"
+                    className="w-full p-2 border rounded mb-2"
+                  />
+                  <button onClick={() => handleCalificar(r.id)} className="bg-green-600 text-white px-4 py-2 rounded font-bold">Guardar</button>
+                </div>
               </div>
             );
           })}

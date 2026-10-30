@@ -1,5 +1,6 @@
 import pool from '../db.js';
 import { hashPassword, comparePassword } from '../utils/auth.js';
+import { calcularResultado } from '../utils/calificacion.js';
 export const obtenerEvaluaciones = async (req, res) => {
     try {
         let query = '';
@@ -69,13 +70,13 @@ export const obtenerEvaluacionPorId = async (req, res) => {
 export const obtenerRespuestasEvaluacion = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(`SELECT re.id, re.evaluacion_id, re.estudiante_id, TRIM(u.nombre_completo || ' ' || COALESCE(u.apellido, '')) AS nombre_completo, re.estado, re.fecha_envio, re.cambios_pestana, re.log_incidentes,
+        const result = await pool.query(`SELECT re.id, re.evaluacion_id, re.estudiante_id, TRIM(u.nombre_completo || ' ' || COALESCE(u.apellido, '')) AS nombre_completo, re.estado, re.fecha_envio, re.cambios_pestana, re.log_incidentes, re.calificacion_publicada,
               json_agg(json_build_object('pregunta_id', rd.pregunta_id, 'respuesta_texto', rd.respuesta_texto, 'opcion_id', rd.opcion_seleccionada_id)) as respuestas
        FROM respuestas_estudiante re
        JOIN usuarios u ON re.estudiante_id = u.id
        LEFT JOIN respuesta_detalle rd ON re.id = rd.respuesta_estudiante_id
        WHERE re.evaluacion_id = $1
-       GROUP BY re.id, re.evaluacion_id, re.estudiante_id, u.nombre_completo, u.apellido, re.estado, re.fecha_envio, re.cambios_pestana, re.log_incidentes`, [id]);
+       GROUP BY re.id, re.evaluacion_id, re.estudiante_id, u.nombre_completo, u.apellido, re.estado, re.fecha_envio, re.cambios_pestana, re.log_incidentes, re.calificacion_publicada`, [id]);
         res.json(result.rows);
     }
     catch (e) {
@@ -195,7 +196,7 @@ export const calcularPuntaje = async (req, res) => {
         const preguntasResult = await pool.query('SELECT COUNT(*) as total FROM preguntas WHERE evaluacion_id = $1', [id]);
         const total_preguntas = parseInt(preguntasResult.rows[0].total);
         const puntaje_por_pregunta = total_preguntas > 0 ? puntaje_total / total_preguntas : 0;
-        const detalleResult = await pool.query(`SELECT rd.id, rd.pregunta_id, rd.respuesta_texto, p.tipo, o.es_correcta
+        const detalleResult = await pool.query(`SELECT rd.id, rd.pregunta_id, rd.respuesta_texto, rd.puntaje_obtenido, rd.retroalimentacion, p.tipo, o.es_correcta
        FROM respuesta_detalle rd
        JOIN preguntas p ON rd.pregunta_id = p.id
        LEFT JOIN opciones o ON CASE WHEN rd.respuesta_texto ~ '^[0-9]+$' THEN rd.respuesta_texto::integer ELSE NULL END = o.id AND p.id = o.pregunta_id
@@ -221,8 +222,13 @@ export const calcularPuntaje = async (req, res) => {
 export const calificarRespuestaAbierta = async (req, res) => {
     try {
         const { respuestaDetalleId } = req.params;
-        const { puntaje } = req.body;
-        await pool.query('UPDATE respuesta_detalle SET puntaje_obtenido = $1, calificada_manualmente = true, fecha_calificacion = NOW() WHERE id = $2', [puntaje, respuestaDetalleId]);
+        const { puntaje, retroalimentacion } = req.body;
+        await pool.query(`UPDATE respuesta_detalle
+       SET puntaje_obtenido = COALESCE($1, puntaje_obtenido),
+           retroalimentacion = $2,
+           calificada_manualmente = true,
+           fecha_calificacion = NOW()
+       WHERE id = $3`, [puntaje === undefined || puntaje === '' ? null : puntaje, retroalimentacion || null, respuestaDetalleId]);
         res.json({ success: true });
     }
     catch (e) {
@@ -232,12 +238,19 @@ export const calificarRespuestaAbierta = async (req, res) => {
 export const obtenerCalificacionFinal = async (req, res) => {
     try {
         const { id, respuestaEstudianteId } = req.params;
-        const respResult = await pool.query('SELECT estudiante_id, puntaje_obtenido, puntaje_manual_total, puntaje_final, fecha_calificacion_completa FROM respuestas_estudiante WHERE id = $1 AND evaluacion_id = $2', [respuestaEstudianteId, id]);
+        const respResult = await pool.query('SELECT estudiante_id, puntaje_obtenido, puntaje_manual_total, puntaje_final, fecha_calificacion_completa, calificacion_publicada FROM respuestas_estudiante WHERE id = $1 AND evaluacion_id = $2', [respuestaEstudianteId, id]);
         const respuesta = respResult.rows[0];
         if (!respuesta)
             return res.status(404).json({ error: 'Respuesta no encontrada' });
         if (req.role === 'estudiante' && respuesta.estudiante_id !== req.userId) {
             return res.status(403).json({ error: 'No tienes permiso' });
+        }
+        if (req.role === 'estudiante' && !respuesta.calificacion_publicada) {
+            return res.status(403).json({ error: 'La calificación aún no ha sido publicada' });
+        }
+        if (req.role === 'estudiante') {
+            const calc = await calcularResultado(parseInt(id), parseInt(respuestaEstudianteId));
+            respuesta.puntaje_final = calc.puntaje_final;
         }
         res.json(respuesta);
     }

@@ -14,6 +14,7 @@ const AgregarPreguntas: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const [enunciadoEdit, setEnunciadoEdit] = useState('');
+  const [esperadaEdit, setEsperadaEdit] = useState('');
   const [opcionesEdit, setOpcionesEdit] = useState<any[]>([]);
 
   const [asignaturas, setAsignaturas] = useState<any[]>([]);
@@ -33,6 +34,7 @@ const AgregarPreguntas: React.FC = () => {
     enunciado: '',
     tipo: 'seleccion_multiple',
     opciones: [{ contenido: '', es_correcta: false }],
+    respuesta_esperada: '',
     puntaje: 0
   });
 
@@ -77,10 +79,11 @@ const AgregarPreguntas: React.FC = () => {
       const payload = {
         enunciado: form.enunciado,
         tipo: form.tipo,
-        opciones: form.opciones
+        opciones: form.opciones,
+        respuesta_esperada: form.tipo === 'seleccion_multiple' ? null : form.respuesta_esperada
       };
       await api.post(`/evaluaciones/${parcialId}/preguntas`, payload);
-      setForm({ enunciado: '', tipo: 'seleccion_multiple', opciones: [{ contenido: '', es_correcta: false }], puntaje: 0 });
+      setForm({ enunciado: '', tipo: 'seleccion_multiple', opciones: [{ contenido: '', es_correcta: false }], respuesta_esperada: '', puntaje: 0 });
       await cargarParcial();
     } catch (e) {
       alert('Error');
@@ -104,6 +107,7 @@ const AgregarPreguntas: React.FC = () => {
 
   const abrirEdicion = () => {
     setEnunciadoEdit(preguntaSeleccionada.enunciado);
+    setEsperadaEdit(preguntaSeleccionada.respuesta_esperada || '');
     setOpcionesEdit(preguntaSeleccionada.opciones || []);
     setEditando(true);
   };
@@ -122,7 +126,8 @@ const AgregarPreguntas: React.FC = () => {
     try {
       const payload = {
         enunciado: enunciadoEdit,
-        opciones: opcionesEdit
+        opciones: opcionesEdit,
+        respuesta_esperada: preguntaSeleccionada.tipo === 'seleccion_multiple' ? undefined : esperadaEdit
       };
       await api.put(`/evaluaciones/${parcialId}/preguntas/${preguntaSeleccionada.id}`, payload);
       setEditando(false);
@@ -210,6 +215,13 @@ const AgregarPreguntas: React.FC = () => {
                 </div>
               )}
 
+              {form.tipo !== 'seleccion_multiple' && (
+                <div>
+                  <label className="block font-bold mb-2">Respuesta esperada</label>
+                  <textarea value={form.respuesta_esperada} onChange={(e) => setForm({...form, respuesta_esperada: e.target.value})} placeholder="Los estudiantes la verán cuando publiques sus calificaciones" className="w-full p-2 border rounded h-20" />
+                </div>
+              )}
+
               <button type="submit" disabled={loading} className="w-full bg-green-600 text-white px-4 py-2 rounded font-bold">Crear Pregunta</button>
             </form>
           </div>
@@ -246,6 +258,13 @@ const AgregarPreguntas: React.FC = () => {
                 <p className="font-bold mb-2">Tipo: {preguntaSeleccionada.tipo}</p>
               </div>
 
+              {preguntaSeleccionada.tipo !== 'seleccion_multiple' && (
+                <div className="mb-4">
+                  <p className="font-bold mb-2">Respuesta esperada:</p>
+                  <p className="text-gray-800 whitespace-pre-wrap">{preguntaSeleccionada.respuesta_esperada || 'Sin definir'}</p>
+                </div>
+              )}
+
               {preguntaSeleccionada.tipo === 'seleccion_multiple' && (
                 <div>
                   <p className="font-bold mb-2">Opciones:</p>
@@ -280,6 +299,13 @@ const AgregarPreguntas: React.FC = () => {
                 <label className="block font-bold mb-2">Enunciado</label>
                 <textarea value={enunciadoEdit} onChange={(e) => setEnunciadoEdit(e.target.value)} className="w-full p-2 border rounded" rows={3} />
               </div>
+
+              {preguntaSeleccionada.tipo !== 'seleccion_multiple' && (
+                <div className="mb-4">
+                  <label className="block font-bold mb-2">Respuesta esperada</label>
+                  <textarea value={esperadaEdit} onChange={(e) => setEsperadaEdit(e.target.value)} className="w-full p-2 border rounded" rows={3} />
+                </div>
+              )}
 
               {preguntaSeleccionada.tipo === 'seleccion_multiple' && (
                 <div>
