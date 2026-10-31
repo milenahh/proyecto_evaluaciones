@@ -185,6 +185,7 @@ const DashboardDocente: React.FC = () => {
             <h1 className="text-3xl font-bold">Evaluaciones</h1>
             <div className="flex gap-2">
               <button onClick={cargarEvaluaciones} className="bg-gray-600 text-white px-4 py-2 rounded font-bold">↻ Refrescar</button>
+              <button onClick={() => navigate('/docente/notas')} className="bg-purple-600 text-white px-4 py-2 rounded font-bold">Notas por corte</button>
               <button onClick={() => navigate('/docente/crear-parcial')} className="bg-green-600 text-white px-4 py-2 rounded font-bold">+ Crear Parcial</button>
             </div>
           </div>

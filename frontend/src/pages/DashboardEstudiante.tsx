@@ -16,6 +16,14 @@ interface RespuestaEstudiante {
   evaluacion_id: number;
 }
 
+interface NotaCorte {
+  asignatura_id: number;
+  asignatura: string;
+  corte: number;
+  componentes: { nombre: string; peso: number | null; nota: number | null }[];
+  nota_final: number | null;
+}
+
 interface Calificacion {
   puntaje_final: number;
   puntaje_obtenido: number;
@@ -29,6 +37,11 @@ export default function DashboardEstudiante() {
   const [respondidas, setRespondidas] = useState<Map<number, RespuestaEstudiante>>(new Map());
   const [calificaciones, setCalificaciones] = useState<Map<number, Calificacion>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [notasCorte, setNotasCorte] = useState<NotaCorte[]>([]);
+
+  useEffect(() => {
+    api.get('/notas/mis-notas').then((r) => setNotasCorte(r.data)).catch(() => setNotasCorte([]));
+  }, []);
 
   useEffect(() => {
     const fetchEvaluaciones = async () => {
@@ -92,6 +105,41 @@ export default function DashboardEstudiante() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {notasCorte.length > 0 && (
+          <div className="mb-10">
+            <h1 className="text-3xl font-bold mb-4">Mis notas por corte</h1>
+            <div className="grid gap-4 md:grid-cols-2">
+              {notasCorte.map((n) => (
+                <div key={`${n.asignatura_id}-${n.corte}`} className="bg-white rounded-lg shadow p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="text-lg font-semibold">{n.asignatura}</div>
+                      <div className="text-sm text-gray-500">Corte {n.corte}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Nota final</div>
+                      <div className="text-3xl font-bold text-green-600">{n.nota_final ?? '-'}</div>
+                    </div>
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {n.componentes.map((c, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="py-1">
+                            {c.nombre}
+                            {c.peso !== null ? <span className="text-gray-400"> ({c.peso}%)</span> : null}
+                          </td>
+                          <td className="py-1 text-right font-semibold">{c.nota ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <h1 className="text-3xl font-bold mb-8">Mis Evaluaciones</h1>
         
         {evals.length === 0 ? (
