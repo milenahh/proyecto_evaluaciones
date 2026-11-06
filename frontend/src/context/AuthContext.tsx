@@ -5,7 +5,7 @@ export interface Usuario {
   id: string;
   email: string;
   nombre_completo: string;
-  rol: 'admin' | 'docente' | 'estudiante';
+  rol: 'admin' | 'docente' | 'estudiante' | 'coordinador';
 }
 
 export interface LoginResponse {

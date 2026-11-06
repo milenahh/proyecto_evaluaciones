@@ -242,6 +242,7 @@ const AdminPanel: React.FC = () => {
                     <option value="estudiante">Estudiante</option>
                     <option value="docente">Docente</option>
                     <option value="admin">Admin</option>
+                    <option value="coordinador">Coordinador (solo consulta)</option>
                   </select>
                 </div>
                 <button type="submit" className="w-full bg-green-600 text-white px-4 py-2 rounded font-bold">Crear</button>
@@ -374,6 +375,7 @@ const AdminPanel: React.FC = () => {
                     <option value="estudiante">Estudiante</option>
                     <option value="docente">Docente</option>
                     <option value="admin">Admin</option>
+                    <option value="coordinador">Coordinador (solo consulta)</option>
                   </select>
                 </div>
               </div>

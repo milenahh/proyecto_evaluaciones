@@ -22,6 +22,7 @@ const AgregarPreguntas: React.FC = () => {
   const [formParcial, setFormParcial] = useState<any>({
     titulo: '',
     asignatura_id: '',
+    corte: '',
     descripcion: '',
     puntaje_total: 0,
     tiempo_limite_minutos: 0,
@@ -57,6 +58,7 @@ const AgregarPreguntas: React.FC = () => {
       setFormParcial({
         titulo: res.data.titulo,
         asignatura_id: res.data.asignatura_id || '',
+        corte: res.data.corte || '',
         descripcion: res.data.descripcion,
         puntaje_total: res.data.puntaje_total,
         tiempo_limite_minutos: res.data.tiempo_limite_minutos,
@@ -155,6 +157,7 @@ const AgregarPreguntas: React.FC = () => {
       const payload = {
         titulo: formParcial.titulo,
         asignatura_id: formParcial.asignatura_id,
+        corte: formParcial.corte,
         descripcion: formParcial.descripcion,
         puntaje_total: formParcial.puntaje_total,
         tiempo_limite_minutos: formParcial.tiempo_limite_minutos,
@@ -350,6 +353,16 @@ const AgregarPreguntas: React.FC = () => {
                     {asignaturas.map(a => (
                       <option key={a.id} value={a.id}>{a.nombre}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold mb-2">Corte</label>
+                  <select value={formParcial.corte} onChange={(e) => setFormParcial({...formParcial, corte: e.target.value})} className="w-full p-2 border rounded">
+                    <option value="">Sin corte</option>
+                    <option value="1">Corte 1</option>
+                    <option value="2">Corte 2</option>
+                    <option value="3">Corte 3</option>
                   </select>
                 </div>
 

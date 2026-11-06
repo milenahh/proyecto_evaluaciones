@@ -16,6 +16,9 @@ const ProtectedRouteWrapper: React.FC<Props> = ({ children }) => {
     if (usuario.rol === 'admin') {
       return <Navigate to="/admin" />;
     }
+    if (usuario.rol === 'coordinador') {
+      return <Navigate to="/consulta" />;
+    }
     if (usuario.rol === 'docente') {
       return <Navigate to="/docente/dashboard" />;
     }

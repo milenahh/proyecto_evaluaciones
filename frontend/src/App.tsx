@@ -9,6 +9,7 @@ import AgregarPreguntas from './pages/AgregarPreguntas';
 import AdminPanel from './pages/AdminPanel';
 import ResultadoEvaluacion from './pages/ResultadoEvaluacion';
 import NotasCortes from './pages/NotasCortes';
+import Consulta from './pages/Consulta';
 import ProtectedRouteWrapper from './components/ProtectedRouteWrapper';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/docente/dashboard" element={<ProtectedRouteWrapper><DashboardDocente /></ProtectedRouteWrapper>} />
           <Route path="/evaluacion/:evaluacionId" element={<ProtectedRouteWrapper><TomarEvaluacion /></ProtectedRouteWrapper>} />
           <Route path="/evaluacion/:evaluacionId/resultado" element={<ProtectedRouteWrapper><ResultadoEvaluacion /></ProtectedRouteWrapper>} />
+          <Route path="/consulta" element={<ProtectedRouteWrapper><Consulta /></ProtectedRouteWrapper>} />
           <Route path="/docente/notas" element={<ProtectedRouteWrapper><NotasCortes /></ProtectedRouteWrapper>} />
           <Route path="/docente/crear-parcial" element={<ProtectedRouteWrapper><CrearParcial /></ProtectedRouteWrapper>} />
           <Route path="/docente/parcial/:parcialId/preguntas" element={<ProtectedRouteWrapper><AgregarPreguntas /></ProtectedRouteWrapper>} />

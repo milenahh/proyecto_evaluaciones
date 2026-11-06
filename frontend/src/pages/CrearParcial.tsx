@@ -11,6 +11,7 @@ const CrearParcial: React.FC = () => {
     puntaje_total: 5,
     tiempo_limite_minutos: 60,
     asignatura_id: '',
+    corte: '',
     fecha_inicio: '',
     fecha_fin: '',
     contraseña: ''
@@ -104,6 +105,16 @@ const CrearParcial: React.FC = () => {
               {asignaturas.map(a => (
                 <option key={a.id} value={a.id}>{a.nombre}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold mb-2">Corte</label>
+            <select value={form.corte} onChange={(e) => setForm({...form, corte: e.target.value})} className="w-full p-3 border rounded">
+              <option value="">Sin corte</option>
+              <option value="1">Corte 1</option>
+              <option value="2">Corte 2</option>
+              <option value="3">Corte 3</option>
             </select>
           </div>
 

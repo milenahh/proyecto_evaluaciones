@@ -46,13 +46,13 @@ export const obtenerRespuestasEstudiante = async (req: AuthRequest, res: Respons
 
 export const crearEvaluacion = async (req: AuthRequest, res: Response) => {
   try {
-    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, fecha_inicio, fecha_fin, contraseña } = req.body;
+    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, fecha_inicio, fecha_fin, contraseña, corte } = req.body;
     const contraseña_hash = contraseña ? await hashPassword(contraseña) : null;
     
     const result = await pool.query(
-      `INSERT INTO evaluaciones (titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, docente_id, estado, fecha_inicio, fecha_fin, contraseña)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, titulo`,
-      [titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, req.userId, 'borrador', fecha_inicio, fecha_fin, contraseña_hash]
+      `INSERT INTO evaluaciones (titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, docente_id, estado, fecha_inicio, fecha_fin, contraseña, corte)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, titulo`,
+      [titulo, descripcion, puntaje_total, tiempo_limite_minutos, asignatura_id, req.userId, 'borrador', fecha_inicio, fecha_fin, contraseña_hash, corte ? parseInt(corte) : null]
     );
     
     res.status(201).json(result.rows[0]);
@@ -199,17 +199,17 @@ export const borrarRespuestas = async (req: AuthRequest, res: Response) => {
 export const editarEvaluacion = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, contraseña, asignatura_id } = req.body;
+    const { titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, contraseña, asignatura_id, corte } = req.body;
 
-    let query = `UPDATE evaluaciones SET titulo = $1, descripcion = $2, puntaje_total = $3, tiempo_limite_minutos = $4, fecha_inicio = $5, fecha_fin = $6, asignatura_id = COALESCE($7, asignatura_id)`;
-    let params: any[] = [titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, asignatura_id ? parseInt(asignatura_id) : null];
+    let query = `UPDATE evaluaciones SET titulo = $1, descripcion = $2, puntaje_total = $3, tiempo_limite_minutos = $4, fecha_inicio = $5, fecha_fin = $6, asignatura_id = COALESCE($7, asignatura_id), corte = COALESCE($8, corte)`;
+    let params: any[] = [titulo, descripcion, puntaje_total, tiempo_limite_minutos, fecha_inicio, fecha_fin, asignatura_id ? parseInt(asignatura_id) : null, corte ? parseInt(corte) : null];
 
     if (contraseña) {
       const contraseña_hash = await hashPassword(contraseña);
-      query += `, contraseña = $8 WHERE id = $9`;
+      query += `, contraseña = $9 WHERE id = $10`;
       params.push(contraseña_hash);
     } else {
-      query += ` WHERE id = $8`;
+      query += ` WHERE id = $9`;
     }
 
     params.push(id);
