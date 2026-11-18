@@ -23,6 +23,12 @@ export const crearPregunta = async (req, res) => {
 export const obtenerPreguntasPorEvaluacion = async (req, res) => {
     try {
         const { id } = req.params;
+        if (req.role === 'estudiante') {
+            const hab = await pool.query('SELECT habilitada FROM evaluaciones WHERE id = $1', [id]);
+            if (hab.rows[0]?.habilitada !== true) {
+                return res.status(403).json({ error: 'Esta evaluación no está disponible' });
+            }
+        }
         const result = await pool.query(`SELECT p.id, p.evaluacion_id, p.enunciado, p.tipo, p.orden, p.respuesta_esperada,
               COALESCE(json_agg(json_build_object('id', o.id, 'contenido', o.contenido, 'es_correcta', o.es_correcta)) FILTER (WHERE o.id IS NOT NULL), '[]'::json) as opciones
        FROM preguntas p

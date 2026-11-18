@@ -13,7 +13,7 @@ export const obtenerEvaluaciones = async (req, res) => {
             query = `SELECT DISTINCT e.* FROM evaluaciones e
                JOIN asignaturas a ON e.asignatura_id = a.id
                JOIN estudiante_asignatura ea ON a.id = ea.asignatura_id
-               WHERE ea.estudiante_id = $1
+               WHERE ea.estudiante_id = $1 AND e.habilitada = true
                ORDER BY e.id DESC`;
             params = [req.userId];
         }
@@ -65,6 +65,9 @@ export const obtenerAsignaturas = async (req, res) => {
 export const obtenerEvaluacionPorId = async (req, res) => {
     const { id } = req.params;
     const result = await pool.query('SELECT * FROM evaluaciones WHERE id = $1', [id]);
+    if (req.role === 'estudiante' && result.rows[0]?.habilitada !== true) {
+        return res.status(403).json({ error: 'Esta evaluación no está disponible' });
+    }
     res.json(result.rows[0] || {});
 };
 export const obtenerRespuestasEvaluacion = async (req, res) => {
@@ -87,10 +90,13 @@ export const verificarContraseña = async (req, res) => {
     try {
         const { id } = req.params;
         const { contraseña } = req.body;
-        const result = await pool.query('SELECT contraseña FROM evaluaciones WHERE id = $1', [id]);
+        const result = await pool.query('SELECT contraseña, habilitada FROM evaluaciones WHERE id = $1', [id]);
         const evaluacion = result.rows[0];
         if (!evaluacion) {
             return res.status(404).json({ error: 'Evaluación no encontrada' });
+        }
+        if (req.role === 'estudiante' && evaluacion.habilitada !== true) {
+            return res.status(403).json({ error: 'Esta evaluación no está disponible' });
         }
         if (!evaluacion.contraseña) {
             return res.json({ success: true, message: 'Sin contraseña requerida' });
@@ -109,13 +115,18 @@ export const enviarRespuestas = async (req, res) => {
     try {
         const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
         const { respuestas, incidentes } = req.body;
-        const evalCheck = await pool.query('SELECT fecha_inicio, fecha_fin FROM evaluaciones WHERE id = $1', [parseInt(id)]);
+        const evalCheck = await pool.query('SELECT fecha_inicio, fecha_fin, habilitada FROM evaluaciones WHERE id = $1', [parseInt(id)]);
         const eval_data = evalCheck.rows[0];
         const ahora = new Date();
-        if (eval_data.fecha_inicio && new Date(eval_data.fecha_inicio) > ahora) {
+        if (req.role === 'estudiante' && eval_data?.habilitada !== true) {
+            return res.status(403).json({ error: 'Esta evaluación no está disponible' });
+        }
+        const habilitado = await pool.query('SELECT 1 FROM habilitaciones_parcial WHERE evaluacion_id = $1 AND estudiante_id = $2', [parseInt(id), req.userId]);
+        const exentoDeFechas = habilitado.rows.length > 0;
+        if (!exentoDeFechas && eval_data.fecha_inicio && new Date(eval_data.fecha_inicio) > ahora) {
             return res.status(400).json({ error: 'La evaluación aún no está disponible' });
         }
-        if (eval_data.fecha_fin && new Date(eval_data.fecha_fin) < ahora) {
+        if (!exentoDeFechas && eval_data.fecha_fin && new Date(eval_data.fecha_fin) < ahora) {
             return res.status(400).json({ error: 'La evaluación ya ha vencido' });
         }
         const existe = await pool.query('SELECT id FROM respuestas_estudiante WHERE evaluacion_id = $1 AND estudiante_id = $2', [parseInt(id), req.userId]);

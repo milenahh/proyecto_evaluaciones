@@ -140,6 +140,15 @@ const DashboardDocente: React.FC = () => {
     }
   };
 
+  const handleHabilitar = async (evalId: number, habilitada: boolean) => {
+    try {
+      await api.put(`/evaluaciones/${evalId}/habilitar-estudiantes`, { habilitada });
+      await cargarEvaluaciones();
+    } catch (e) {
+      alert('Error al habilitar el parcial');
+    }
+  };
+
   const handleArchivar = async (evalId: number, archivada: boolean) => {
     try {
       await api.put(`/evaluaciones/${evalId}/archivar`, { archivada });
@@ -210,7 +219,15 @@ const DashboardDocente: React.FC = () => {
             evaluaciones.filter(e => !!e.archivada === verArchivadas).map(e => (
               <div key={e.id} className="bg-white p-4 mb-3 rounded">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold cursor-pointer flex-1" onClick={() => handleSelectEval(e.id)}>{e.titulo}</h3>
+                  <h3 className="font-bold cursor-pointer flex-1" onClick={() => handleSelectEval(e.id)}>
+                    {e.titulo}
+                    <span className={`ml-2 text-xs font-normal ${e.habilitada ? 'text-green-700' : 'text-gray-500'}`}>
+                      {e.habilitada ? '(visible para estudiantes)' : '(oculto para estudiantes)'}
+                    </span>
+                  </h3>
+                  <button onClick={() => handleHabilitar(e.id, !e.habilitada)} className={`${e.habilitada ? 'bg-gray-500' : 'bg-green-700'} text-white px-3 py-1 rounded text-sm mr-2`}>
+                    {e.habilitada ? 'Ocultar a estudiantes' : 'Habilitar a estudiantes'}
+                  </button>
                   <button onClick={() => handleDescargarExcel(e.id, e.titulo)} className="bg-emerald-600 text-white px-3 py-1 rounded text-sm mr-2">Excel</button>
                   <button onClick={() => handleArchivar(e.id, !verArchivadas)} className="bg-yellow-600 text-white px-3 py-1 rounded text-sm mr-2">
                     {verArchivadas ? 'Desarchivar' : 'Archivar'}

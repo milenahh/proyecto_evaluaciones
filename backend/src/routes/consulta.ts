@@ -9,7 +9,8 @@ import {
   detalleConsulta,
   notasCorteConsulta,
   datosAplicar,
-  aplicarParcial,
+  habilitarParcial,
+  quitarHabilitacion,
 } from '../controllers/consultaController.js';
 
 const router = Router();
@@ -23,6 +24,7 @@ router.get('/asignaturas/:asignaturaId/notas-corte', authMiddleware, roles, nota
 router.get('/evaluaciones/:evaluacionId/participantes', authMiddleware, roles, participantesConsulta);
 router.get('/evaluaciones/:evaluacionId/respuestas/:respuestaId', authMiddleware, roles, detalleConsulta);
 router.get('/evaluaciones/:evaluacionId/aplicar', authMiddleware, roles, datosAplicar);
-router.post('/evaluaciones/:evaluacionId/aplicar', authMiddleware, roles, aplicarParcial);
+router.post('/evaluaciones/:evaluacionId/habilitar', authMiddleware, roles, habilitarParcial);
+router.delete('/evaluaciones/:evaluacionId/habilitar/:estudianteId', authMiddleware, roles, quitarHabilitacion);
 
 export default router;

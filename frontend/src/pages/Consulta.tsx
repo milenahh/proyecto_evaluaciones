@@ -25,8 +25,6 @@ const Consulta: React.FC = () => {
   const [participantes, setParticipantes] = useState<any[]>([]);
   const [detalle, setDetalle] = useState<any>(null);
   const [aplicarDatos, setAplicarDatos] = useState<any>(null);
-  const [aplicarEstudiante, setAplicarEstudiante] = useState('');
-  const [aplicarRespuestas, setAplicarRespuestas] = useState<Record<number, string>>({});
   const [aplicarMensaje, setAplicarMensaje] = useState('');
   const [notasDetalle, setNotasDetalle] = useState<Record<number, { puntaje: string; retro: string }>>({});
   const [mensajeDetalle, setMensajeDetalle] = useState('');
@@ -101,9 +99,6 @@ const Consulta: React.FC = () => {
     manejar(async () => {
       const r = await api.get(`/consulta/evaluaciones/${evaluacionIdNum}/aplicar`);
       setAplicarDatos(r.data);
-      const libre = r.data.pendientes.find((p: any) => !p.ya_respondio);
-      setAplicarEstudiante(libre ? String(libre.id) : '');
-      setAplicarRespuestas({});
     });
 
   const abrirAplicar = (e: any) => {
@@ -113,20 +108,18 @@ const Consulta: React.FC = () => {
     cargarAplicar(e.id);
   };
 
-  const enviarAplicar = () => {
-    if (!aplicarEstudiante) return;
-    const nombre = aplicarDatos.pendientes.find((p: any) => String(p.id) === aplicarEstudiante)?.nombre;
-    if (!window.confirm(`Vas a registrar las respuestas de ${nombre}. Esta acción no se puede deshacer. ¿Continuar?`)) return;
+  const habilitar = (est: any) =>
     manejar(async () => {
-      const respuestas = aplicarDatos.preguntas.map((p: any) => ({
-        pregunta_id: p.id,
-        respuesta_texto: aplicarRespuestas[p.id] ?? '',
-      }));
-      await api.post(`/consulta/evaluaciones/${evaluacion.id}/aplicar`, {
-        estudiante_id: parseInt(aplicarEstudiante),
-        respuestas,
-      });
-      setAplicarMensaje(`Respuestas de ${nombre} registradas. Las calificaciones quedan pendientes de revisión por el docente.`);
+      await api.post(`/consulta/evaluaciones/${evaluacion.id}/habilitar`, { estudiante_id: est.id });
+      setAplicarMensaje(`${est.nombre} ya puede presentar el parcial desde su cuenta.`);
+      await cargarAplicar(evaluacion.id);
+    });
+
+  const quitar = (est: any) => {
+    if (!window.confirm(`¿Quitar la habilitación a ${est.nombre}?`)) return;
+    manejar(async () => {
+      await api.delete(`/consulta/evaluaciones/${evaluacion.id}/habilitar/${est.id}`);
+      setAplicarMensaje(`Habilitación quitada a ${est.nombre}.`);
       await cargarAplicar(evaluacion.id);
     });
   };
@@ -269,7 +262,7 @@ const Consulta: React.FC = () => {
                             Ver participantes
                           </button>
                           <button onClick={() => abrirAplicar(e)} className="text-green-700 underline">
-                            Aplicar a estudiante
+                            Habilitar estudiante
                           </button>
                         </td>
                       </tr>
@@ -490,73 +483,86 @@ const Consulta: React.FC = () => {
         {vista === 'aplicar' && evaluacion && (
           <>
             {btnAtras('Evaluaciones', 'evaluaciones')}
-            <h1 className="text-3xl font-bold mb-1">Aplicar: {evaluacion.titulo}</h1>
-            <p className="text-gray-600 mb-4">Registra las respuestas de un estudiante que no pudo presentar el parcial en la plataforma.</p>
+            <h1 className="text-3xl font-bold mb-1">Habilitar: {evaluacion.titulo}</h1>
+            <p className="text-gray-600 mb-4">Habilita el parcial a un estudiante para que lo presente desde su cuenta. Puedes quitar la habilitación mientras no haya presentado.</p>
 
             {aplicarMensaje && <div className="bg-green-100 text-green-800 p-3 rounded mb-4">{aplicarMensaje}</div>}
 
-            {aplicarDatos && aplicarDatos.pendientes.every((p: any) => p.ya_respondio) && (
-              <div className="bg-white rounded-lg shadow p-4 text-gray-600">Todos los estudiantes matriculados ya tienen respuestas registradas.</div>
+            {aplicarDatos && (
+              <div className="bg-white rounded-lg shadow overflow-x-auto mb-8">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="p-3">Estudiante</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aplicarDatos.pendientes.map((p: any) => (
+                      <tr key={p.id} className="border-b">
+                        <td className="p-3">{p.nombre}</td>
+                        <td className="p-3">
+                          {p.ya_respondio ? (
+                            <span className="text-green-700 font-bold">Ya presentó</span>
+                          ) : p.habilitado ? (
+                            <span className="text-blue-700 font-bold">Habilitado, esperando que presente</span>
+                          ) : (
+                            <span className="text-gray-500">No habilitado</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {p.ya_respondio ? null : p.habilitado ? (
+                            <button onClick={() => quitar(p)} disabled={cargando} className="text-red-600 underline">
+                              Quitar habilitación
+                            </button>
+                          ) : (
+                            <button onClick={() => habilitar(p)} disabled={cargando} className="text-green-700 underline">
+                              Habilitar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {aplicarDatos.pendientes.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-4 text-center text-gray-500">No hay estudiantes matriculados en esta asignatura.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
 
-            {aplicarDatos && aplicarDatos.pendientes.some((p: any) => !p.ya_respondio) && (
-              <div className="bg-white rounded-lg shadow p-6 space-y-6">
-                <div>
-                  <label className="block font-bold mb-2">Estudiante</label>
-                  <select value={aplicarEstudiante} onChange={(e) => setAplicarEstudiante(e.target.value)} className="w-full p-2 border rounded">
-                    {aplicarDatos.pendientes.map((p: any) => (
-                      <option key={p.id} value={p.id} disabled={p.ya_respondio}>
-                        {p.nombre}
-                        {p.ya_respondio ? ' (ya presentó)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {aplicarDatos.preguntas.map((p: any, idx: number) => (
-                  <div key={p.id} className="border-t pt-4">
-                    <div className="font-semibold mb-2">
-                      {idx + 1}. {p.enunciado}
+            {aplicarDatos && (
+              <>
+                <h2 className="text-xl font-bold mb-3">Parcial configurado (referencia)</h2>
+                <div className="bg-white rounded-lg shadow p-6 space-y-4">
+                  {aplicarDatos.preguntas.map((p: any, idx: number) => (
+                    <div key={p.id} className="border-t pt-3 first:border-t-0 first:pt-0">
+                      <div className="font-semibold">
+                        {idx + 1}. {p.enunciado}
+                      </div>
+                      {p.tipo === 'seleccion_multiple' ? (
+                        <ul className="mt-1 ml-4 list-disc text-sm">
+                          {p.opciones.map((o: any) => (
+                            <li key={o.id} className={o.es_correcta ? 'font-bold text-green-700' : ''}>
+                              {o.contenido}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        p.respuesta_esperada && (
+                          <div className="mt-1 text-sm text-gray-700">
+                            <span className="text-xs text-gray-500">Respuesta esperada: </span>
+                            {p.respuesta_esperada}
+                          </div>
+                        )
+                      )}
                     </div>
-                    {p.tipo === 'seleccion_multiple' ? (
-                      <div className="space-y-1">
-                        {p.opciones.map((o: any) => (
-                          <label key={o.id} className={`flex items-center gap-2 ${o.es_correcta ? 'font-bold text-green-700' : ''}`}>
-                            <input
-                              type="radio"
-                              name={`pregunta-${p.id}`}
-                              value={o.id}
-                              checked={aplicarRespuestas[p.id] === String(o.id)}
-                              onChange={(e) => setAplicarRespuestas({ ...aplicarRespuestas, [p.id]: e.target.value })}
-                            />
-                            {o.contenido}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={aplicarRespuestas[p.id] ?? ''}
-                        onChange={(e) => setAplicarRespuestas({ ...aplicarRespuestas, [p.id]: e.target.value })}
-                        className="w-full p-2 border rounded h-24"
-                      />
-                    )}
-                    {p.tipo !== 'seleccion_multiple' && p.respuesta_esperada && (
-                      <div className="mt-2 text-sm text-gray-700">
-                        <span className="text-xs text-gray-500">Respuesta esperada (docente): </span>
-                        {p.respuesta_esperada}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <button
-                  onClick={enviarAplicar}
-                  disabled={cargando || !aplicarEstudiante}
-                  className="w-full bg-green-600 text-white px-4 py-3 rounded font-bold disabled:bg-gray-300"
-                >
-                  Registrar respuestas del estudiante
-                </button>
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}

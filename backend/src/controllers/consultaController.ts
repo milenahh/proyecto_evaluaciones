@@ -213,7 +213,8 @@ export const datosAplicar = async (req: AuthRequest, res: Response) => {
 
     const pendientes = await pool.query(
       `SELECT u.id, TRIM(u.apellido || ' ' || u.nombre_completo) AS nombre,
-              EXISTS (SELECT 1 FROM respuestas_estudiante re WHERE re.evaluacion_id = $2 AND re.estudiante_id = u.id) AS ya_respondio
+              EXISTS (SELECT 1 FROM respuestas_estudiante re WHERE re.evaluacion_id = $2 AND re.estudiante_id = u.id) AS ya_respondio,
+              EXISTS (SELECT 1 FROM habilitaciones_parcial h WHERE h.evaluacion_id = $2 AND h.estudiante_id = u.id) AS habilitado
        FROM estudiante_asignatura ea
        JOIN usuarios u ON u.id = ea.estudiante_id
        WHERE ea.asignatura_id = $1 AND u.rol = 'estudiante'
@@ -228,65 +229,53 @@ export const datosAplicar = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const aplicarParcial = async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
-  let enTransaccion = false;
+export const habilitarParcial = async (req: AuthRequest, res: Response) => {
   try {
     const evaluacionId = parseInt(req.params.evaluacionId);
     if (!(await accesoEvaluacion(req, evaluacionId))) return res.status(403).json({ error: 'Sin acceso a esta evaluación' });
     const estudianteId = parseInt(req.body.estudiante_id);
-    const respuestas = req.body.respuestas;
-    if (!estudianteId || !Array.isArray(respuestas)) {
-      return res.status(400).json({ error: 'Datos incompletos' });
-    }
+    if (!estudianteId) return res.status(400).json({ error: 'Datos incompletos' });
 
-    const ev = await client.query('SELECT asignatura_id FROM evaluaciones WHERE id = $1', [evaluacionId]);
-    if (ev.rows.length === 0) return res.status(404).json({ error: 'Evaluación no encontrada' });
-
-    const matriculado = await client.query(
+    const asig = await asignaturaDeEvaluacion(evaluacionId);
+    const mat = await pool.query(
       'SELECT 1 FROM estudiante_asignatura WHERE estudiante_id = $1 AND asignatura_id = $2',
-      [estudianteId, ev.rows[0].asignatura_id]
+      [estudianteId, asig]
     );
-    if (matriculado.rows.length === 0) {
-      return res.status(400).json({ error: 'El estudiante no está matriculado en esta asignatura' });
-    }
+    if (mat.rows.length === 0) return res.status(400).json({ error: 'El estudiante no está matriculado en esta asignatura' });
 
-    await client.query('BEGIN');
-    enTransaccion = true;
-
-    const ya = await client.query(
-      'SELECT 1 FROM respuestas_estudiante WHERE evaluacion_id = $1 AND estudiante_id = $2 FOR UPDATE',
+    const ya = await pool.query(
+      'SELECT 1 FROM respuestas_estudiante WHERE evaluacion_id = $1 AND estudiante_id = $2',
       [evaluacionId, estudianteId]
     );
-    if (ya.rows.length > 0) {
-      await client.query('ROLLBACK');
-      enTransaccion = false;
-      return res.status(400).json({ error: 'Este estudiante ya tiene respuestas registradas para este parcial' });
-    }
+    if (ya.rows.length > 0) return res.status(400).json({ error: 'Este estudiante ya presentó el parcial' });
 
-    const log = [{ tipo: 'aplicada_por_coordinador', hora: new Date().toISOString(), usuario_id: req.userId }];
-    const r = await client.query(
-      `INSERT INTO respuestas_estudiante (evaluacion_id, estudiante_id, estado, cambios_pestana, log_incidentes)
-       VALUES ($1, $2, 'enviada', 0, $3) RETURNING id`,
-      [evaluacionId, estudianteId, JSON.stringify(log)]
+    await pool.query(
+      `INSERT INTO habilitaciones_parcial (evaluacion_id, estudiante_id, habilitado_por)
+       VALUES ($1, $2, $3) ON CONFLICT (evaluacion_id, estudiante_id) DO NOTHING`,
+      [evaluacionId, estudianteId, req.userId]
     );
-
-    for (const resp of respuestas) {
-      await client.query(
-        'INSERT INTO respuesta_detalle (respuesta_estudiante_id, pregunta_id, respuesta_texto) VALUES ($1, $2, $3)',
-        [r.rows[0].id, parseInt(resp.pregunta_id), resp.respuesta_texto ?? null]
-      );
-    }
-
-    await client.query('COMMIT');
-    enTransaccion = false;
-    res.status(201).json({ success: true, respuesta_id: r.rows[0].id });
+    res.status(201).json({ success: true });
   } catch (e: any) {
-    if (enTransaccion) await client.query('ROLLBACK').catch(() => {});
-    console.error('Error aplicarParcial:', e.message);
+    console.error('Error habilitarParcial:', e.message);
     res.status(500).json({ error: e.message });
-  } finally {
-    client.release();
+  }
+};
+
+export const quitarHabilitacion = async (req: AuthRequest, res: Response) => {
+  try {
+    const evaluacionId = parseInt(req.params.evaluacionId);
+    const estudianteId = parseInt(req.params.estudianteId);
+    if (!(await accesoEvaluacion(req, evaluacionId))) return res.status(403).json({ error: 'Sin acceso a esta evaluación' });
+    const ya = await pool.query(
+      'SELECT 1 FROM respuestas_estudiante WHERE evaluacion_id = $1 AND estudiante_id = $2',
+      [evaluacionId, estudianteId]
+    );
+    if (ya.rows.length > 0) return res.status(400).json({ error: 'El estudiante ya presentó; no se puede quitar la habilitación' });
+    await pool.query('DELETE FROM habilitaciones_parcial WHERE evaluacion_id = $1 AND estudiante_id = $2', [evaluacionId, estudianteId]);
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Error quitarHabilitacion:', e.message);
+    res.status(500).json({ error: e.message });
   }
 };
 

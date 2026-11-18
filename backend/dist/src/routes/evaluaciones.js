@@ -6,6 +6,7 @@ import { exportarRespuestasExcel } from '../controllers/exportController.js';
 import { archivarEvaluacion } from '../controllers/archivoController.js';
 import { publicarCalificaciones, obtenerMiResultado } from '../controllers/resultadosController.js';
 import { puedeCalificarDetalle } from '../controllers/consultaController.js';
+import { toggleHabilitada } from '../controllers/visibilidadController.js';
 const router = Router();
 router.get('/', authMiddleware, evaluacionController.obtenerEvaluaciones);
 router.post('/', authMiddleware, requireRole(['docente']), evaluacionController.crearEvaluacion);
@@ -19,6 +20,7 @@ router.get('/:id/respuestas', authMiddleware, requireRole(['docente', 'admin']),
 router.post('/:id/publicar-calificaciones', authMiddleware, requireRole(['docente', 'admin', 'coordinador']), publicarCalificaciones);
 router.get('/:id/mi-resultado', authMiddleware, requireRole(['estudiante']), obtenerMiResultado);
 router.put('/:id/archivar', authMiddleware, requireRole(['docente', 'admin']), archivarEvaluacion);
+router.put('/:id/habilitar-estudiantes', authMiddleware, requireRole(['docente', 'admin']), toggleHabilitada);
 router.get('/:id/exportar', authMiddleware, requireRole(['docente', 'admin']), exportarRespuestasExcel);
 router.get('/:id/mis-respuestas', authMiddleware, evaluacionController.obtenerRespuestasEstudiante);
 router.post('/:id/verificar-password', authMiddleware, evaluacionController.verificarContraseña);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
-import { asignaturasConsulta, evaluacionesConsulta, estudiantesConsulta, vistaEstudianteConsulta, participantesConsulta, detalleConsulta, notasCorteConsulta, datosAplicar, aplicarParcial, } from '../controllers/consultaController.js';
+import { asignaturasConsulta, evaluacionesConsulta, estudiantesConsulta, vistaEstudianteConsulta, participantesConsulta, detalleConsulta, notasCorteConsulta, datosAplicar, habilitarParcial, quitarHabilitacion, } from '../controllers/consultaController.js';
 const router = Router();
 const roles = requireRole(['coordinador', 'admin', 'docente']);
 router.get('/asignaturas', authMiddleware, roles, asignaturasConsulta);
@@ -11,5 +11,6 @@ router.get('/asignaturas/:asignaturaId/notas-corte', authMiddleware, roles, nota
 router.get('/evaluaciones/:evaluacionId/participantes', authMiddleware, roles, participantesConsulta);
 router.get('/evaluaciones/:evaluacionId/respuestas/:respuestaId', authMiddleware, roles, detalleConsulta);
 router.get('/evaluaciones/:evaluacionId/aplicar', authMiddleware, roles, datosAplicar);
-router.post('/evaluaciones/:evaluacionId/aplicar', authMiddleware, roles, aplicarParcial);
+router.post('/evaluaciones/:evaluacionId/habilitar', authMiddleware, roles, habilitarParcial);
+router.delete('/evaluaciones/:evaluacionId/habilitar/:estudianteId', authMiddleware, roles, quitarHabilitacion);
 export default router;
