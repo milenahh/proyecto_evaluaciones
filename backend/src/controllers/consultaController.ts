@@ -6,7 +6,11 @@ import { detalleEsAplicado } from '../utils/aplicadas.js';
 
 // Admin y coordinador ven todo. El docente solo ve sus asignaturas asignadas.
 const accesoAsignatura = async (req: AuthRequest, asignaturaId: number): Promise<boolean> => {
-  if (req.role === 'admin' || req.role === 'coordinador') return true;
+  if (req.role === 'admin') return true;
+  if (req.role === 'coordinador') {
+    const v = await pool.query('SELECT visible_coordinador FROM asignaturas WHERE id = $1', [asignaturaId]);
+    return v.rows[0]?.visible_coordinador === true;
+  }
   if (req.role !== 'docente') return false;
   const r = await pool.query(
     'SELECT 1 FROM docente_asignatura WHERE usuario_id = $1 AND asignatura_id = $2 LIMIT 1',
@@ -21,8 +25,11 @@ const asignaturaDeEvaluacion = async (evaluacionId: number): Promise<number | nu
 };
 
 const accesoEvaluacion = async (req: AuthRequest, evaluacionId: number): Promise<boolean> => {
-  const asig = await asignaturaDeEvaluacion(evaluacionId);
-  return asig !== null && (await accesoAsignatura(req, asig));
+  const r = await pool.query('SELECT asignatura_id, visible_coordinador FROM evaluaciones WHERE id = $1', [evaluacionId]);
+  const ev = r.rows[0];
+  if (!ev) return false;
+  if (req.role === 'coordinador' && ev.visible_coordinador === false) return false;
+  return await accesoAsignatura(req, ev.asignatura_id);
 };
 
 export const asignaturasConsulta = async (req: AuthRequest, res: Response) => {
@@ -33,10 +40,11 @@ export const asignaturasConsulta = async (req: AuthRequest, res: Response) => {
       filtro = 'JOIN docente_asignatura da ON da.asignatura_id = a.id AND da.usuario_id = $1';
       params.push(req.userId);
     }
+    const where = req.role === 'coordinador' ? 'WHERE a.visible_coordinador = true' : '';
     const result = await pool.query(
-      `SELECT a.id, a.nombre,
+      `SELECT a.id, a.nombre, a.visible_coordinador,
               (SELECT COUNT(*) FROM evaluaciones e WHERE e.asignatura_id = a.id)::int AS total_evaluaciones
-       FROM asignaturas a ${filtro} ORDER BY a.nombre`,
+       FROM asignaturas a ${filtro} ${where} ORDER BY a.nombre`,
       params
     );
     res.json(result.rows);
@@ -57,9 +65,9 @@ export const evaluacionesConsulta = async (req: AuthRequest, res: Response) => {
               (SELECT COUNT(*) FROM estudiante_asignatura ea WHERE ea.asignatura_id = e.asignatura_id)::int AS matriculados
        FROM evaluaciones e
        LEFT JOIN usuarios d ON d.id = e.docente_id
-       WHERE e.asignatura_id = $1
+       WHERE e.asignatura_id = $1 AND ($2 <> 'coordinador' OR e.visible_coordinador = true)
        ORDER BY e.corte NULLS LAST, e.id`,
-      [asignaturaId]
+      [asignaturaId, req.role]
     );
     res.json(result.rows);
   } catch (e: any) {
@@ -114,8 +122,9 @@ export const vistaEstudianteConsulta = async (req: AuthRequest, res: Response) =
       `SELECT re.id, re.evaluacion_id, e.titulo, e.corte
        FROM respuestas_estudiante re JOIN evaluaciones e ON e.id = re.evaluacion_id
        WHERE e.asignatura_id = $1 AND re.estudiante_id = $2 AND re.calificacion_publicada = true
+         AND ($3 <> 'coordinador' OR e.visible_coordinador = true)
        ORDER BY e.id`,
-      [asignaturaId, estudianteId]
+      [asignaturaId, estudianteId, req.role]
     );
     const parciales = [];
     for (const r of resp.rows) {

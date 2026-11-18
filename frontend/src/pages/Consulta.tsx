@@ -50,6 +50,13 @@ const Consulta: React.FC = () => {
     });
   }, []);
 
+  const toggleVisibleCoordinadorAsignatura = (a: any) =>
+    manejar(async () => {
+      await api.put(`/consulta/asignaturas/${a.id}/visible-coordinador`, { visible: a.visible_coordinador === false });
+      const r = await api.get('/consulta/asignaturas');
+      setAsignaturas(r.data);
+    });
+
   const abrirAsignatura = (a: any) =>
     manejar(async () => {
       const [ev, nc] = await Promise.all([
@@ -187,10 +194,22 @@ const Consulta: React.FC = () => {
             <p className="text-gray-600 mb-4">Selecciona una asignatura.</p>
             <div className="grid gap-4 md:grid-cols-2">
               {asignaturas.map((a) => (
-                <button key={a.id} onClick={() => abrirAsignatura(a)} className="bg-white rounded-lg shadow hover:shadow-lg p-5 text-left">
-                  <div className="text-lg font-semibold">{a.nombre}</div>
-                  <div className="text-sm text-gray-500">{a.total_evaluaciones} evaluaciones</div>
-                </button>
+                <div key={a.id} className="bg-white rounded-lg shadow p-5">
+                  <button onClick={() => abrirAsignatura(a)} className="text-left w-full hover:opacity-80">
+                    <div className="text-lg font-semibold">{a.nombre}</div>
+                    <div className="text-sm text-gray-500">{a.total_evaluaciones} evaluaciones</div>
+                  </button>
+                  {usuario?.rol === 'docente' && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className={`text-xs ${a.visible_coordinador === false ? 'text-gray-500' : 'text-blue-700'}`}>
+                        {a.visible_coordinador === false ? '(oculta para coordinador)' : '(visible para coordinador)'}
+                      </span>
+                      <button onClick={() => toggleVisibleCoordinadorAsignatura(a)} className={`${a.visible_coordinador === false ? 'bg-blue-700' : 'bg-gray-500'} text-white px-3 py-1 rounded text-sm`}>
+                        {a.visible_coordinador === false ? 'Mostrar a coordinador' : 'Ocultar a coordinador'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </>

@@ -16,7 +16,11 @@ const mismosTokens = (a: string[], b: string[]) => a.length === b.length && a.ev
 const contiene = (grande: string[], chico: string[]) => chico.length > 0 && chico.every((t) => grande.includes(t));
 
 const puedeGestionar = async (req: AuthRequest, asignaturaId: number): Promise<boolean> => {
-  if (req.role === 'admin' || req.role === 'coordinador') return true;
+  if (req.role === 'admin') return true;
+  if (req.role === 'coordinador') {
+    const v = await pool.query('SELECT visible_coordinador FROM asignaturas WHERE id = $1', [asignaturaId]);
+    return v.rows[0]?.visible_coordinador === true;
+  }
   const r = await pool.query(
     'SELECT 1 FROM docente_asignatura WHERE usuario_id = $1 AND asignatura_id = $2 LIMIT 1',
     [req.userId, asignaturaId]

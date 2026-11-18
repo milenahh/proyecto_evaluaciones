@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { asignaturasConsulta, evaluacionesConsulta, estudiantesConsulta, vistaEstudianteConsulta, participantesConsulta, detalleConsulta, notasCorteConsulta, datosAplicar, habilitarParcial, quitarHabilitacion, } from '../controllers/consultaController.js';
+import { toggleAsignaturaVisibleCoordinador } from '../controllers/visibilidadController.js';
 const router = Router();
 const roles = requireRole(['coordinador', 'admin', 'docente']);
 router.get('/asignaturas', authMiddleware, roles, asignaturasConsulta);
+router.put('/asignaturas/:asignaturaId/visible-coordinador', authMiddleware, requireRole(['docente', 'admin']), toggleAsignaturaVisibleCoordinador);
 router.get('/asignaturas/:asignaturaId/evaluaciones', authMiddleware, roles, evaluacionesConsulta);
 router.get('/asignaturas/:asignaturaId/estudiantes', authMiddleware, roles, estudiantesConsulta);
 router.get('/asignaturas/:asignaturaId/estudiantes/:estudianteId/vista', authMiddleware, roles, vistaEstudianteConsulta);

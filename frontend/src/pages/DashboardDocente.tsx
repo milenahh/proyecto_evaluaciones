@@ -140,6 +140,15 @@ const DashboardDocente: React.FC = () => {
     }
   };
 
+  const handleVisibleCoordinador = async (evalId: number, visible: boolean) => {
+    try {
+      await api.put(`/evaluaciones/${evalId}/visible-coordinador`, { visible });
+      await cargarEvaluaciones();
+    } catch (e) {
+      alert('Error al cambiar la visibilidad para el coordinador');
+    }
+  };
+
   const handleHabilitar = async (evalId: number, habilitada: boolean) => {
     try {
       await api.put(`/evaluaciones/${evalId}/habilitar-estudiantes`, { habilitada });
@@ -224,7 +233,13 @@ const DashboardDocente: React.FC = () => {
                     <span className={`ml-2 text-xs font-normal ${e.habilitada ? 'text-green-700' : 'text-gray-500'}`}>
                       {e.habilitada ? '(visible para estudiantes)' : '(oculto para estudiantes)'}
                     </span>
+                    <span className={`ml-2 text-xs font-normal ${e.visible_coordinador === false ? 'text-gray-500' : 'text-blue-700'}`}>
+                      {e.visible_coordinador === false ? '(oculto para coordinador)' : '(visible para coordinador)'}
+                    </span>
                   </h3>
+                  <button onClick={() => handleVisibleCoordinador(e.id, e.visible_coordinador === false)} className={`${e.visible_coordinador === false ? 'bg-blue-700' : 'bg-gray-500'} text-white px-3 py-1 rounded text-sm mr-2`}>
+                    {e.visible_coordinador === false ? 'Mostrar a coordinador' : 'Ocultar a coordinador'}
+                  </button>
                   <button onClick={() => handleHabilitar(e.id, !e.habilitada)} className={`${e.habilitada ? 'bg-gray-500' : 'bg-green-700'} text-white px-3 py-1 rounded text-sm mr-2`}>
                     {e.habilitada ? 'Ocultar a estudiantes' : 'Habilitar a estudiantes'}
                   </button>
