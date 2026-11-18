@@ -24,16 +24,85 @@ const puedeGestionar = async (req: AuthRequest, asignaturaId: number): Promise<b
   return r.rows.length > 0;
 };
 
-export const importarNotas = async (req: AuthRequest, res: Response) => {
+const cargarActividades = async (asignaturaId: number, corte: number) => {
+  const r = await pool.query(
+    `SELECT nombre, porcentaje::float AS porcentaje FROM actividades_corte
+     WHERE asignatura_id = $1 AND corte = $2 ORDER BY orden`,
+    [asignaturaId, corte]
+  );
+  return r.rows as { nombre: string; porcentaje: number }[];
+};
+
+export const listarActividades = async (req: AuthRequest, res: Response) => {
   try {
-    const { asignatura_id, corte, columnas, filas } = req.body;
-    const asignaturaId = parseInt(asignatura_id);
-    const corteNum = parseInt(corte);
-    if (!asignaturaId || ![1, 2, 3].includes(corteNum) || !Array.isArray(columnas) || !Array.isArray(filas)) {
+    const asignaturaId = parseInt(String(req.query.asignatura_id));
+    const corte = parseInt(String(req.query.corte));
+    if (!asignaturaId || ![1, 2, 3].includes(corte)) return res.status(400).json({ error: 'Datos incompletos' });
+    if (!(await puedeGestionar(req, asignaturaId))) return res.status(403).json({ error: 'No tienes permiso sobre esta asignatura' });
+    res.json(await cargarActividades(asignaturaId, corte));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const guardarActividades = async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
+  let enTransaccion = false;
+  try {
+    const asignaturaId = parseInt(req.body.asignatura_id);
+    const corte = parseInt(req.body.corte);
+    const actividades = req.body.actividades;
+    if (!asignaturaId || ![1, 2, 3].includes(corte) || !Array.isArray(actividades)) {
       return res.status(400).json({ error: 'Datos incompletos' });
     }
-    if (!(await puedeGestionar(req, asignaturaId))) {
-      return res.status(403).json({ error: 'No tienes permiso sobre esta asignatura' });
+    if (!(await puedeGestionar(req, asignaturaId))) return res.status(403).json({ error: 'No tienes permiso sobre esta asignatura' });
+
+    const limpias: { nombre: string; porcentaje: number }[] = [];
+    for (const a of actividades) {
+      const nombre = String(a.nombre || '').trim();
+      const porcentaje = Number(String(a.porcentaje).replace(',', '.'));
+      if (!nombre) return res.status(400).json({ error: 'Cada actividad necesita un nombre' });
+      if (!(porcentaje > 0 && porcentaje <= 100)) return res.status(400).json({ error: `El porcentaje de "${nombre}" debe estar entre 0 y 100` });
+      limpias.push({ nombre, porcentaje });
+    }
+    const total = limpias.reduce((acc, a) => acc + a.porcentaje, 0);
+    if (total > 100) return res.status(400).json({ error: `Las actividades suman ${total}%. No pueden pasar de 100%` });
+
+    await client.query('BEGIN');
+    enTransaccion = true;
+    await client.query('DELETE FROM actividades_corte WHERE asignatura_id = $1 AND corte = $2', [asignaturaId, corte]);
+    for (let i = 0; i < limpias.length; i++) {
+      await client.query(
+        'INSERT INTO actividades_corte (asignatura_id, corte, orden, nombre, porcentaje) VALUES ($1, $2, $3, $4, $5)',
+        [asignaturaId, corte, i + 1, limpias[i].nombre, limpias[i].porcentaje]
+      );
+    }
+    await client.query('COMMIT');
+    enTransaccion = false;
+    res.json({ success: true, total });
+  } catch (e: any) {
+    if (enTransaccion) await client.query('ROLLBACK').catch(() => {});
+    console.error('Error guardarActividades:', e.message);
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
+
+// filas: [{ nombre, notas: [n1, n2, ...] }] en el mismo orden de las actividades (escala 0 a 5)
+export const importarNotas = async (req: AuthRequest, res: Response) => {
+  try {
+    const asignaturaId = parseInt(req.body.asignatura_id);
+    const corte = parseInt(req.body.corte);
+    const filas = req.body.filas;
+    if (!asignaturaId || ![1, 2, 3].includes(corte) || !Array.isArray(filas)) {
+      return res.status(400).json({ error: 'Datos incompletos' });
+    }
+    if (!(await puedeGestionar(req, asignaturaId))) return res.status(403).json({ error: 'No tienes permiso sobre esta asignatura' });
+
+    const actividades = await cargarActividades(asignaturaId, corte);
+    if (actividades.length === 0) {
+      return res.status(400).json({ error: 'Primero define las actividades del corte' });
     }
 
     const estRes = await pool.query(
@@ -49,6 +118,7 @@ export const importarNotas = async (req: AuthRequest, res: Response) => {
 
     let importadas = 0;
     const sinCoincidencia: string[] = [];
+    const errores: string[] = [];
     const usados = new Set<number>();
 
     for (const fila of filas) {
@@ -66,11 +136,22 @@ export const importarNotas = async (req: AuthRequest, res: Response) => {
       const estudiante = candidatos[0];
       usados.add(estudiante.id);
 
-      const componentes = columnas.map((c: any, i: number) => ({
-        nombre: c.nombre,
-        peso: c.peso ?? null,
-        nota: fila.notas && fila.notas[i] !== undefined ? fila.notas[i] : null,
-      }));
+      const notas: number[] = [];
+      let valida = true;
+      for (let i = 0; i < actividades.length; i++) {
+        const v = fila.notas?.[i];
+        const n = v === null || v === undefined || v === '' ? 0 : Number(v);
+        if (!(n >= 0 && n <= 5)) {
+          valida = false;
+          errores.push(`${fila.nombre}: nota inválida en "${actividades[i].nombre}"`);
+          break;
+        }
+        notas.push(n);
+      }
+      if (!valida) continue;
+
+      const componentes = actividades.map((a, i) => ({ nombre: a.nombre, peso: a.porcentaje, nota: notas[i] }));
+      const nota_final = Number((notas.reduce((acc, n, i) => acc + n * actividades[i].porcentaje, 0) / 100).toFixed(2));
 
       await pool.query(
         `INSERT INTO notas_corte (asignatura_id, estudiante_id, corte, componentes, nota_final, docente_id)
@@ -78,12 +159,12 @@ export const importarNotas = async (req: AuthRequest, res: Response) => {
          ON CONFLICT (asignatura_id, estudiante_id, corte)
          DO UPDATE SET componentes = EXCLUDED.componentes, nota_final = EXCLUDED.nota_final,
                        docente_id = EXCLUDED.docente_id, fecha_actualizacion = NOW()`,
-        [asignaturaId, estudiante.id, corteNum, JSON.stringify(componentes), fila.nota_final ?? null, req.userId]
+        [asignaturaId, estudiante.id, corte, JSON.stringify(componentes), nota_final, req.userId]
       );
       importadas++;
     }
 
-    res.json({ importadas, sin_coincidencia: sinCoincidencia });
+    res.json({ importadas, sin_coincidencia: sinCoincidencia, errores });
   } catch (e: any) {
     console.error('Error importarNotas:', e.message);
     res.status(500).json({ error: e.message });
