@@ -1,3 +1,4 @@
+import { todasAplicadas } from '../utils/aplicadas.js';
 import { Response } from 'express';
 import pool from '../db.js';
 import { AuthRequest } from '../middleware/auth.js';
@@ -11,7 +12,8 @@ export const publicarCalificaciones = async (req: AuthRequest, res: Response) =>
     const evalRes = await pool.query('SELECT docente_id FROM evaluaciones WHERE id = $1', [id]);
     const evaluacion = evalRes.rows[0];
     if (!evaluacion) return res.status(404).json({ error: 'Evaluación no encontrada' });
-    if (req.role !== 'admin' && evaluacion.docente_id !== req.userId) {
+    const esCoordinadorAplicado = req.role === 'coordinador' && (await todasAplicadas(parseInt(id), respuesta_ids));
+    if (req.role !== 'admin' && evaluacion.docente_id !== req.userId && !esCoordinadorAplicado) {
       return res.status(403).json({ error: 'No tienes permiso sobre esta evaluación' });
     }
 

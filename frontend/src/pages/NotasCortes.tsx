@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface Columna {
   nombre: string;
@@ -84,6 +85,8 @@ const interpretar = (texto: string): { columnas: Columna[]; filas: FilaImport[];
 
 const NotasCortes: React.FC = () => {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const esCoordinador = usuario?.rol === 'coordinador';
   const [asignaturas, setAsignaturas] = useState<any[]>([]);
   const [asignaturaId, setAsignaturaId] = useState('');
   const [corte, setCorte] = useState('2');
@@ -97,7 +100,7 @@ const NotasCortes: React.FC = () => {
 
   useEffect(() => {
     api
-      .get('/evaluaciones/asignaturas')
+      .get(esCoordinador ? '/consulta/asignaturas' : '/evaluaciones/asignaturas')
       .then((r) => {
         setAsignaturas(r.data);
         if (r.data.length === 1) setAsignaturaId(String(r.data[0].id));
@@ -190,7 +193,7 @@ const NotasCortes: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Notas por corte</h1>
-          <button onClick={() => navigate('/docente/dashboard')} className="bg-gray-600 text-white px-4 py-2 rounded font-bold">
+          <button onClick={() => navigate(esCoordinador ? '/consulta' : '/docente/dashboard')} className="bg-gray-600 text-white px-4 py-2 rounded font-bold">
             ← Volver
           </button>
         </div>

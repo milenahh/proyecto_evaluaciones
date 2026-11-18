@@ -10,7 +10,7 @@ const normalizar = (s) => String(s || '')
 const mismosTokens = (a, b) => a.length === b.length && a.every((t, i) => t === b[i]);
 const contiene = (grande, chico) => chico.length > 0 && chico.every((t) => grande.includes(t));
 const puedeGestionar = async (req, asignaturaId) => {
-    if (req.role === 'admin')
+    if (req.role === 'admin' || req.role === 'coordinador')
         return true;
     const r = await pool.query('SELECT 1 FROM docente_asignatura WHERE usuario_id = $1 AND asignatura_id = $2 LIMIT 1', [req.userId, asignaturaId]);
     return r.rows.length > 0;

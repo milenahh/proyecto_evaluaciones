@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-type Vista = 'asignaturas' | 'evaluaciones' | 'participantes' | 'detalle';
+type Vista = 'asignaturas' | 'evaluaciones' | 'estudiantes' | 'vistaEstudiante' | 'participantes' | 'detalle' | 'aplicar';
 
 const fmt = (n: any) => (n === null || n === undefined ? '-' : Number(n).toFixed(2).replace('.', ','));
 
 const Consulta: React.FC = () => {
+  const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [vista, setVista] = useState<Vista>('asignaturas');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -20,6 +24,14 @@ const Consulta: React.FC = () => {
   const [evaluacion, setEvaluacion] = useState<any>(null);
   const [participantes, setParticipantes] = useState<any[]>([]);
   const [detalle, setDetalle] = useState<any>(null);
+  const [aplicarDatos, setAplicarDatos] = useState<any>(null);
+  const [aplicarEstudiante, setAplicarEstudiante] = useState('');
+  const [aplicarRespuestas, setAplicarRespuestas] = useState<Record<number, string>>({});
+  const [aplicarMensaje, setAplicarMensaje] = useState('');
+  const [notasDetalle, setNotasDetalle] = useState<Record<number, { puntaje: string; retro: string }>>({});
+  const [mensajeDetalle, setMensajeDetalle] = useState('');
+  const [estudiantes, setEstudiantes] = useState<any[]>([]);
+  const [estudianteVista, setEstudianteVista] = useState<any>(null);
 
   const manejar = async (fn: () => Promise<void>) => {
     setError('');
@@ -66,8 +78,87 @@ const Consulta: React.FC = () => {
     manejar(async () => {
       const r = await api.get(`/consulta/evaluaciones/${evaluacion.id}/respuestas/${p.id}`);
       setDetalle(r.data);
+      setNotasDetalle({});
+      setMensajeDetalle('');
       setVista('detalle');
     });
+
+  const abrirEstudiantes = () =>
+    manejar(async () => {
+      const r = await api.get(`/consulta/asignaturas/${asignatura.id}/estudiantes`);
+      setEstudiantes(r.data);
+      setVista('estudiantes');
+    });
+
+  const abrirVistaEstudiante = (est: any) =>
+    manejar(async () => {
+      const r = await api.get(`/consulta/asignaturas/${asignatura.id}/estudiantes/${est.id}/vista`);
+      setEstudianteVista({ nombre: est.nombre, ...r.data });
+      setVista('vistaEstudiante');
+    });
+
+  const cargarAplicar = (evaluacionIdNum: number) =>
+    manejar(async () => {
+      const r = await api.get(`/consulta/evaluaciones/${evaluacionIdNum}/aplicar`);
+      setAplicarDatos(r.data);
+      const libre = r.data.pendientes.find((p: any) => !p.ya_respondio);
+      setAplicarEstudiante(libre ? String(libre.id) : '');
+      setAplicarRespuestas({});
+    });
+
+  const abrirAplicar = (e: any) => {
+    setAplicarMensaje('');
+    setEvaluacion(e);
+    setVista('aplicar');
+    cargarAplicar(e.id);
+  };
+
+  const enviarAplicar = () => {
+    if (!aplicarEstudiante) return;
+    const nombre = aplicarDatos.pendientes.find((p: any) => String(p.id) === aplicarEstudiante)?.nombre;
+    if (!window.confirm(`Vas a registrar las respuestas de ${nombre}. Esta acción no se puede deshacer. ¿Continuar?`)) return;
+    manejar(async () => {
+      const respuestas = aplicarDatos.preguntas.map((p: any) => ({
+        pregunta_id: p.id,
+        respuesta_texto: aplicarRespuestas[p.id] ?? '',
+      }));
+      await api.post(`/consulta/evaluaciones/${evaluacion.id}/aplicar`, {
+        estudiante_id: parseInt(aplicarEstudiante),
+        respuestas,
+      });
+      setAplicarMensaje(`Respuestas de ${nombre} registradas. Las calificaciones quedan pendientes de revisión por el docente.`);
+      await cargarAplicar(evaluacion.id);
+    });
+  };
+
+  const recargarDetalle = async () => {
+    const r = await api.get(`/consulta/evaluaciones/${evaluacion.id}/respuestas/${detalle.respuesta_id}`);
+    setDetalle(r.data);
+    setNotasDetalle({});
+  };
+
+  const guardarItem = (it: any) =>
+    manejar(async () => {
+      const edit = notasDetalle[it.detalle_id] || { puntaje: '', retro: it.retroalimentacion || '' };
+      await api.post(`/evaluaciones/${evaluacion.id}/respuesta-detalle/${it.detalle_id}/calificar`, {
+        puntaje: edit.puntaje === '' ? undefined : parseFloat(edit.puntaje.replace(',', '.')),
+        retroalimentacion: edit.retro,
+      });
+      setMensajeDetalle('Calificación de la pregunta guardada.');
+      await recargarDetalle();
+    });
+
+  const publicarDetalle = (publicar: boolean) => {
+    if (publicar && !window.confirm('Se publicará la calificación del parcial para este estudiante. ¿Continuar?')) return;
+    manejar(async () => {
+      await api.post(`/evaluaciones/${evaluacion.id}/publicar-calificaciones`, {
+        publicar,
+        respuesta_ids: [detalle.respuesta_id],
+      });
+      setMensajeDetalle(publicar ? 'Calificación publicada. El estudiante ya la puede ver.' : 'Calificación ocultada.');
+      await recargarDetalle();
+    });
+  };
 
   const evaluacionesFiltradas = evaluaciones.filter((e) => {
     if (filtroCorte === 'todos') return true;
@@ -77,6 +168,12 @@ const Consulta: React.FC = () => {
 
   const btnAtras = (texto: string, destino: Vista) => (
     <button onClick={() => setVista(destino)} className="mb-4 px-4 py-2 bg-gray-600 text-white rounded font-bold">
+      ← {texto}
+    </button>
+  );
+
+  const btnAtras2 = (texto: string, fn: () => void) => (
+    <button onClick={fn} className="mb-4 px-4 py-2 bg-gray-600 text-white rounded font-bold">
       ← {texto}
     </button>
   );
@@ -92,7 +189,8 @@ const Consulta: React.FC = () => {
 
         {vista === 'asignaturas' && (
           <>
-            <h1 className="text-3xl font-bold mb-6">Consulta de resultados</h1>
+            {usuario?.rol === 'docente' && btnAtras2('Dashboard', () => navigate('/docente/dashboard'))}
+            <h1 className="text-3xl font-bold mb-6">{usuario?.rol === 'docente' ? 'Mis asignaturas' : 'Consulta de resultados'}</h1>
             <p className="text-gray-600 mb-4">Selecciona una asignatura.</p>
             <div className="grid gap-4 md:grid-cols-2">
               {asignaturas.map((a) => (
@@ -132,6 +230,12 @@ const Consulta: React.FC = () => {
               <button onClick={() => setVerNotas(true)} className={`px-4 py-2 rounded font-bold ${verNotas ? 'bg-purple-600 text-white' : 'bg-white border'}`}>
                 Notas por corte
               </button>
+              <button onClick={abrirEstudiantes} className="px-4 py-2 rounded font-bold bg-indigo-600 text-white">
+                Estudiantes
+              </button>
+              <button onClick={() => navigate('/docente/notas')} className="px-4 py-2 rounded font-bold bg-green-600 text-white">
+                Registrar notas por corte
+              </button>
             </div>
 
             {!verNotas && (
@@ -160,9 +264,12 @@ const Consulta: React.FC = () => {
                         <td className="p-3">
                           {e.participantes}/{e.matriculados}
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 space-x-3 whitespace-nowrap">
                           <button onClick={() => abrirEvaluacion(e)} className="text-blue-600 underline">
                             Ver participantes
+                          </button>
+                          <button onClick={() => abrirAplicar(e)} className="text-green-700 underline">
+                            Aplicar a estudiante
                           </button>
                         </td>
                       </tr>
@@ -270,6 +377,190 @@ const Consulta: React.FC = () => {
           </>
         )}
 
+        {vista === 'estudiantes' && asignatura && (
+          <>
+            {btnAtras('Evaluaciones', 'evaluaciones')}
+            <h1 className="text-3xl font-bold mb-4">{asignatura.nombre}: estudiantes</h1>
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-3">Estudiante</th>
+                    <th className="p-3">Parciales presentados</th>
+                    <th className="p-3">Parciales publicados</th>
+                    <th className="p-3">Cortes publicados</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estudiantes.map((est) => (
+                    <tr key={est.id} className="border-b">
+                      <td className="p-3">{est.nombre}</td>
+                      <td className="p-3">{est.parciales_presentados}</td>
+                      <td className="p-3">{est.parciales_publicados}</td>
+                      <td className="p-3">{est.cortes_publicados}</td>
+                      <td className="p-3">
+                        <button onClick={() => abrirVistaEstudiante(est)} className="text-blue-600 underline">
+                          Ver como estudiante
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {estudiantes.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-gray-500">
+                        No hay estudiantes matriculados en esta asignatura.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {vista === 'vistaEstudiante' && estudianteVista && (
+          <>
+            {btnAtras('Estudiantes', 'estudiantes')}
+            <h1 className="text-3xl font-bold mb-1">{estudianteVista.nombre}</h1>
+            <p className="text-gray-600 mb-6">Esto es lo que el estudiante ve publicado en su dashboard.</p>
+
+            <h2 className="text-xl font-bold mb-3">Notas por corte</h2>
+            {estudianteVista.notas.length === 0 && <div className="bg-white rounded-lg shadow p-4 text-gray-500 mb-6">No hay notas por corte publicadas.</div>}
+            <div className="grid gap-4 md:grid-cols-2 mb-8">
+              {estudianteVista.notas.map((n: any) => (
+                <div key={n.corte} className="bg-white rounded-lg shadow p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="text-sm text-gray-500">Corte {n.corte}</div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Nota final</div>
+                      <div className="text-3xl font-bold text-green-600">{fmt(n.nota_final)}</div>
+                    </div>
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {n.componentes.map((c: any, i: number) => (
+                        <tr key={i} className="border-t">
+                          <td className="py-1">
+                            {c.nombre}
+                            {c.peso !== null ? <span className="text-gray-400"> ({c.peso}%)</span> : null}
+                          </td>
+                          <td className="py-1 text-right font-semibold">{c.nota ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+
+            <h2 className="text-xl font-bold mb-3">Parciales publicados</h2>
+            {estudianteVista.parciales.length === 0 && <div className="bg-white rounded-lg shadow p-4 text-gray-500">No hay parciales publicados.</div>}
+            <div className="space-y-4">
+              {estudianteVista.parciales.map((p: any, idx: number) => (
+                <div key={idx} className="bg-white rounded-lg shadow p-5">
+                  <div className="flex justify-between mb-3">
+                    <div className="font-semibold">{p.titulo}</div>
+                    <div className="font-bold">
+                      {fmt(p.puntaje_final)} / {fmt(p.puntaje_total)}
+                    </div>
+                  </div>
+                  {p.items.map((it: any) => (
+                    <div key={it.pregunta_id} className="border-t py-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span>
+                          {it.numero}. {it.enunciado}
+                        </span>
+                        <span className="font-semibold whitespace-nowrap">
+                          {fmt(it.puntaje)} / {fmt(it.puntaje_maximo)}
+                        </span>
+                      </div>
+                      <div className="text-gray-700">Respuesta: {it.respuesta || <em className="text-gray-400">Sin respuesta</em>}</div>
+                      {it.respuesta_correcta && <div className="text-green-700">Correcta: {it.respuesta_correcta}</div>}
+                      {it.respuesta_esperada && <div className="text-gray-700">Esperada: {it.respuesta_esperada}</div>}
+                      {it.retroalimentacion && <div className="text-blue-800">Comentario: {it.retroalimentacion}</div>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {vista === 'aplicar' && evaluacion && (
+          <>
+            {btnAtras('Evaluaciones', 'evaluaciones')}
+            <h1 className="text-3xl font-bold mb-1">Aplicar: {evaluacion.titulo}</h1>
+            <p className="text-gray-600 mb-4">Registra las respuestas de un estudiante que no pudo presentar el parcial en la plataforma.</p>
+
+            {aplicarMensaje && <div className="bg-green-100 text-green-800 p-3 rounded mb-4">{aplicarMensaje}</div>}
+
+            {aplicarDatos && aplicarDatos.pendientes.every((p: any) => p.ya_respondio) && (
+              <div className="bg-white rounded-lg shadow p-4 text-gray-600">Todos los estudiantes matriculados ya tienen respuestas registradas.</div>
+            )}
+
+            {aplicarDatos && aplicarDatos.pendientes.some((p: any) => !p.ya_respondio) && (
+              <div className="bg-white rounded-lg shadow p-6 space-y-6">
+                <div>
+                  <label className="block font-bold mb-2">Estudiante</label>
+                  <select value={aplicarEstudiante} onChange={(e) => setAplicarEstudiante(e.target.value)} className="w-full p-2 border rounded">
+                    {aplicarDatos.pendientes.map((p: any) => (
+                      <option key={p.id} value={p.id} disabled={p.ya_respondio}>
+                        {p.nombre}
+                        {p.ya_respondio ? ' (ya presentó)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {aplicarDatos.preguntas.map((p: any, idx: number) => (
+                  <div key={p.id} className="border-t pt-4">
+                    <div className="font-semibold mb-2">
+                      {idx + 1}. {p.enunciado}
+                    </div>
+                    {p.tipo === 'seleccion_multiple' ? (
+                      <div className="space-y-1">
+                        {p.opciones.map((o: any) => (
+                          <label key={o.id} className={`flex items-center gap-2 ${o.es_correcta ? 'font-bold text-green-700' : ''}`}>
+                            <input
+                              type="radio"
+                              name={`pregunta-${p.id}`}
+                              value={o.id}
+                              checked={aplicarRespuestas[p.id] === String(o.id)}
+                              onChange={(e) => setAplicarRespuestas({ ...aplicarRespuestas, [p.id]: e.target.value })}
+                            />
+                            {o.contenido}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={aplicarRespuestas[p.id] ?? ''}
+                        onChange={(e) => setAplicarRespuestas({ ...aplicarRespuestas, [p.id]: e.target.value })}
+                        className="w-full p-2 border rounded h-24"
+                      />
+                    )}
+                    {p.tipo !== 'seleccion_multiple' && p.respuesta_esperada && (
+                      <div className="mt-2 text-sm text-gray-700">
+                        <span className="text-xs text-gray-500">Respuesta esperada (docente): </span>
+                        {p.respuesta_esperada}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  onClick={enviarAplicar}
+                  disabled={cargando || !aplicarEstudiante}
+                  className="w-full bg-green-600 text-white px-4 py-3 rounded font-bold disabled:bg-gray-300"
+                >
+                  Registrar respuestas del estudiante
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
         {vista === 'detalle' && detalle && evaluacion && (
           <>
             {btnAtras('Participantes', 'participantes')}
@@ -280,6 +571,15 @@ const Consulta: React.FC = () => {
                 {fmt(detalle.resultado.puntaje_final)} / {fmt(detalle.resultado.puntaje_total)}
               </span>
             </p>
+            {mensajeDetalle && <div className="bg-green-100 text-green-800 p-3 rounded mb-4">{mensajeDetalle}</div>}
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => publicarDetalle(true)} disabled={cargando} className="bg-green-600 text-white px-4 py-2 rounded font-bold disabled:bg-gray-300">
+                Publicar calificación
+              </button>
+              <button onClick={() => publicarDetalle(false)} disabled={cargando} className="bg-gray-600 text-white px-4 py-2 rounded font-bold disabled:bg-gray-300">
+                Ocultar calificación
+              </button>
+            </div>
             <div className="space-y-4">
               {detalle.resultado.items.map((it: any) => (
                 <div key={it.pregunta_id} className="bg-white rounded-lg shadow p-4">
@@ -311,6 +611,36 @@ const Consulta: React.FC = () => {
                     <div className="mt-2 text-sm text-blue-800">
                       <span className="text-xs text-gray-500">Comentario del docente: </span>
                       {it.retroalimentacion}
+                    </div>
+                  )}
+                  {it.tipo !== 'seleccion_multiple' && it.detalle_id && (
+                    <div className="mt-3 border-t pt-3 flex flex-wrap items-end gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500">Puntaje (máx. {fmt(it.puntaje_maximo)})</label>
+                        <input
+                          type="text"
+                          value={notasDetalle[it.detalle_id]?.puntaje ?? ''}
+                          placeholder={String(it.puntaje ?? '')}
+                          onChange={(e) =>
+                            setNotasDetalle({ ...notasDetalle, [it.detalle_id]: { puntaje: e.target.value, retro: notasDetalle[it.detalle_id]?.retro ?? it.retroalimentacion ?? '' } })
+                          }
+                          className="p-2 border rounded w-28"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-xs text-gray-500">Comentario</label>
+                        <input
+                          type="text"
+                          value={notasDetalle[it.detalle_id]?.retro ?? it.retroalimentacion ?? ''}
+                          onChange={(e) =>
+                            setNotasDetalle({ ...notasDetalle, [it.detalle_id]: { puntaje: notasDetalle[it.detalle_id]?.puntaje ?? '', retro: e.target.value } })
+                          }
+                          className="p-2 border rounded w-full"
+                        />
+                      </div>
+                      <button onClick={() => guardarItem(it)} disabled={cargando} className="bg-blue-600 text-white px-4 py-2 rounded font-bold disabled:bg-gray-300">
+                        Guardar
+                      </button>
                     </div>
                   )}
                 </div>

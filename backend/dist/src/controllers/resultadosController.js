@@ -1,3 +1,4 @@
+import { todasAplicadas } from '../utils/aplicadas.js';
 import pool from '../db.js';
 import { calcularResultado } from '../utils/calificacion.js';
 export const publicarCalificaciones = async (req, res) => {
@@ -8,7 +9,8 @@ export const publicarCalificaciones = async (req, res) => {
         const evaluacion = evalRes.rows[0];
         if (!evaluacion)
             return res.status(404).json({ error: 'Evaluación no encontrada' });
-        if (req.role !== 'admin' && evaluacion.docente_id !== req.userId) {
+        const esCoordinadorAplicado = req.role === 'coordinador' && (await todasAplicadas(parseInt(id), respuesta_ids));
+        if (req.role !== 'admin' && evaluacion.docente_id !== req.userId && !esCoordinadorAplicado) {
             return res.status(403).json({ error: 'No tienes permiso sobre esta evaluación' });
         }
         let query = 'SELECT id FROM respuestas_estudiante WHERE evaluacion_id = $1';
